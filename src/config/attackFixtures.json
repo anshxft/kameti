@@ -1,0 +1,13 @@
+{
+  "_comment": "Round-2 auth for w3 (0xfA0773372042f56992483080Fa4d7571c5B41400) in Attack Lab circle #7. Submit while circle is in round 1 → USDC nonce mismatch.",
+  "wrongRoundFixture": {
+    "from": "0xfA0773372042f56992483080Fa4d7571c5B41400",
+    "circleId": "7",
+    "targetRound": 1,
+    "signedForRound": 2,
+    "validBefore": "1793430574",
+    "v": 28,
+    "r": "0x83c9d7eaaec7435f46ef1ae9a47da15d55e22025a7373ff00eccfc8ffaa78e50",
+    "s": "0x4e4eacd080a9b85ccc4ec68b338df02710f290c0162d29381fea8f53c4465f27"
+  }
+}

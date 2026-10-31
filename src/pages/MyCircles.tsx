@@ -29,7 +29,7 @@ function ScoreBanner({ addr }: { addr: string }) {
 
   if (score === null) return null
   const { label } = scoreTier(score)
-  const cls = score >= 650 ? 'bg-ink text-paper' : score >= 550 ? 'border border-line text-muted' : 'border border-signal text-signal'
+  const cls = score >= 650 ? 'bg-ink text-paper' : score >= 550 ? 'border border-line text-muted' : 'border border-signal-ink text-signal-ink-ink'
 
   return (
     <Link to={`/score/${addr}`} className="press cell px-4 py-3 flex items-center gap-4 hover:bg-paper-2">
@@ -105,7 +105,7 @@ function CircleCard({ circleId, myAddress }: { circleId: bigint; myAddress: stri
         <div className="cell p-2">
           <p className="label text-[9px] text-muted">My Seat</p>
           <p className="font-display text-sm font-bold leading-tight">{myIdx >= 0 ? `#${myIdx + 1}` : '—'}</p>
-          {isMyTurn && <p className="label text-signal font-bold text-[9px]">NOW</p>}
+          {isMyTurn && <p className="label text-signal-ink font-bold text-[9px]">NOW</p>}
         </div>
         <div className="cell p-2 min-w-0">
           <p className="label text-[9px] text-muted">{status === 1 ? 'Round ends' : 'Duration'}</p>
@@ -124,7 +124,7 @@ function CircleCard({ circleId, myAddress }: { circleId: bigint; myAddress: stri
           </div>
           <div className="cell p-2">
             <p className="label text-[9px] text-muted">Claimable</p>
-            <p className={`label font-bold text-[11px] ${myClaimable > 0n ? 'text-signal' : ''}`}>
+            <p className={`label font-bold text-[11px] ${myClaimable > 0n ? 'text-signal-ink' : ''}`}>
               {formatUsdc(myClaimable)}
             </p>
           </div>

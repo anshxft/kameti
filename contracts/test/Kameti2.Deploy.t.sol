@@ -19,7 +19,7 @@ contract Kameti2DeployTest is Kameti2Base {
 
     function test_Deploy_ZeroAddress_Reverts() public {
         vm.expectRevert(Kameti.InvalidParams.selector);
-        new Kameti(address(0));
+        new Kameti(address(0), address(0));
     }
 }
 
@@ -30,43 +30,43 @@ contract Kameti2CreateCircleInvalidTest is Kameti2Base {
     function test_CreateCircle_Revert_MaxMembers_TooLow() public {
         vm.prank(creator);
         vm.expectRevert(Kameti.InvalidParams.selector);
-        kameti.createCircle("x", CONTRIBUTION, 2, ROUND_DUR, DEPOSIT_MUL, MAX_DISC_BPS, 0);
+        kameti.createCircle("x", CONTRIBUTION, 2, ROUND_DUR, DEPOSIT_MUL, MAX_DISC_BPS, 0, 5000, 10);
     }
 
     function test_CreateCircle_Revert_MaxMembers_TooHigh() public {
         vm.prank(creator);
         vm.expectRevert(Kameti.InvalidParams.selector);
-        kameti.createCircle("x", CONTRIBUTION, 11, ROUND_DUR, DEPOSIT_MUL, MAX_DISC_BPS, 0);
+        kameti.createCircle("x", CONTRIBUTION, 11, ROUND_DUR, DEPOSIT_MUL, MAX_DISC_BPS, 0, 5000, 10);
     }
 
     function test_CreateCircle_Revert_RoundDuration_TooShort() public {
         vm.prank(creator);
         vm.expectRevert(Kameti.InvalidParams.selector);
-        kameti.createCircle("x", CONTRIBUTION, 3, 9 minutes, DEPOSIT_MUL, MAX_DISC_BPS, 0);
+        kameti.createCircle("x", CONTRIBUTION, 3, 9 minutes, DEPOSIT_MUL, MAX_DISC_BPS, 0, 5000, 10);
     }
 
     function test_CreateCircle_Revert_DepositMultiplier_Zero() public {
         vm.prank(creator);
         vm.expectRevert(Kameti.InvalidParams.selector);
-        kameti.createCircle("x", CONTRIBUTION, 3, ROUND_DUR, 0, MAX_DISC_BPS, 0);
+        kameti.createCircle("x", CONTRIBUTION, 3, ROUND_DUR, 0, MAX_DISC_BPS, 0, 5000, 10);
     }
 
     function test_CreateCircle_Revert_DepositMultiplier_Four() public {
         vm.prank(creator);
         vm.expectRevert(Kameti.InvalidParams.selector);
-        kameti.createCircle("x", CONTRIBUTION, 3, ROUND_DUR, 4, MAX_DISC_BPS, 0);
+        kameti.createCircle("x", CONTRIBUTION, 3, ROUND_DUR, 4, MAX_DISC_BPS, 0, 5000, 10);
     }
 
     function test_CreateCircle_Revert_MaxDiscountBps_TooHigh() public {
         vm.prank(creator);
         vm.expectRevert(Kameti.InvalidParams.selector);
-        kameti.createCircle("x", CONTRIBUTION, 3, ROUND_DUR, DEPOSIT_MUL, 4001, 0);
+        kameti.createCircle("x", CONTRIBUTION, 3, ROUND_DUR, DEPOSIT_MUL, 4001, 0, 0, 0);
     }
 
     function test_CreateCircle_Revert_MinScore_TooHigh() public {
         vm.prank(creator);
         vm.expectRevert(Kameti.InvalidParams.selector);
-        kameti.createCircle("x", CONTRIBUTION, 3, ROUND_DUR, DEPOSIT_MUL, MAX_DISC_BPS, 901);
+        kameti.createCircle("x", CONTRIBUTION, 3, ROUND_DUR, DEPOSIT_MUL, MAX_DISC_BPS, 901, 5000, 10);
     }
 
     function test_CreateCircle_HappyPath_EmitsEvent() public {
@@ -74,7 +74,7 @@ contract Kameti2CreateCircleInvalidTest is Kameti2Base {
         vm.expectEmit(true, true, false, true, address(kameti));
         emit Kameti.CircleCreated(0, CIRCLE_NAME, CONTRIBUTION, MAX_MEMBERS, creator);
         kameti.createCircle(
-            CIRCLE_NAME, CONTRIBUTION, MAX_MEMBERS, ROUND_DUR, DEPOSIT_MUL, MAX_DISC_BPS, 0
+            CIRCLE_NAME, CONTRIBUTION, MAX_MEMBERS, ROUND_DUR, DEPOSIT_MUL, MAX_DISC_BPS, 0, 5000, 10
         );
     }
 
@@ -439,7 +439,7 @@ contract Kameti2MinScoreTest is Kameti2Base {
         uint256 cId;
         vm.prank(creator);
         cId = kameti.createCircle(
-            "score gate", CONTRIBUTION, 3, ROUND_DUR, DEPOSIT_MUL, MAX_DISC_BPS, 700
+            "score gate", CONTRIBUTION, 3, ROUND_DUR, DEPOSIT_MUL, MAX_DISC_BPS, 700, 5000, 10
         );
         // fresh address has score 600 < 700
         vm.prank(newAddr);
@@ -456,7 +456,7 @@ contract Kameti2MinScoreTest is Kameti2Base {
         for (uint256 c = 0; c < 20; c++) {
             vm.prank(creator);
             uint256 smallId = kameti.createCircle(
-                "boost", CONTRIBUTION, 3, ROUND_DUR, 1, 0, 0
+                "boost", CONTRIBUTION, 3, ROUND_DUR, 1, 0, 0, 0, 0
             );
             _join(alice, smallId);
             _join(newAddr, smallId);
@@ -479,7 +479,7 @@ contract Kameti2MinScoreTest is Kameti2Base {
         // Now join should succeed
         vm.prank(creator);
         uint256 gateId = kameti.createCircle(
-            "score gate", CONTRIBUTION, 3, ROUND_DUR, DEPOSIT_MUL, MAX_DISC_BPS, 700
+            "score gate", CONTRIBUTION, 3, ROUND_DUR, DEPOSIT_MUL, MAX_DISC_BPS, 700, 5000, 10
         );
         vm.prank(newAddr);
         kameti.join(gateId); // should not revert

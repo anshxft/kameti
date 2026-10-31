@@ -1,4 +1,4 @@
-// ─── Kameti v2 contract return types ────────────────────────────────────────
+// ─── Kameti v3.1 contract return types ──────────────────────────────────────
 
 export interface KametiParams {
   name: string
@@ -8,6 +8,8 @@ export interface KametiParams {
   depositMultiplier: number
   maxDiscountBps: number
   minScore: number
+  postWinLockBps: number
+  keeperTipBps: number
 }
 
 // getCircle returns a tuple: (params, status, currentRound, roundEnd, potAccumulated, highestBidder, highestDiscount)
@@ -26,12 +28,20 @@ export interface MemberInfo {
   addr: string
   seat: number
   depositLeft: bigint
+  lockLeft: bigint          // v3.1: post-win lock remaining
   paidThisRound: boolean
   won: boolean
   wonRound: number
   defaulted: boolean
   debt: bigint
-  autoPay: boolean
+  hasStoredAuth: boolean    // v3.1: has pre-signed EIP-3009 auths stored
+}
+
+// protectionOf returns ProtectionInfo
+export interface ProtectionInfo {
+  depositCovered: bigint
+  lockCovered: bigint
+  lockRoundsLeft: number
 }
 
 // getRoundHistory returns RoundRecord[]
@@ -56,5 +66,5 @@ export function scoreTier(score: number): { label: string; color: string } {
   if (score >= 750) return { label: 'EXCELLENT', color: 'text-ink' }
   if (score >= 650) return { label: 'GOOD', color: 'text-ink' }
   if (score >= 550) return { label: 'FAIR', color: 'text-muted' }
-  return { label: 'POOR', color: 'text-signal' }
+  return { label: 'POOR', color: 'text-signal-ink' }
 }

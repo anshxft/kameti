@@ -4,53 +4,74 @@ import {
   useAccount, useReadContract, useWriteContract,
   useWaitForTransactionReceipt, useSwitchChain, usePublicClient,
 } from 'wagmi'
-import { erc20Abi, parseAbiItem } from 'viem'
+import { parseAbiItem, type Hex } from 'viem'
 import { toast } from 'sonner'
-import { Copy, ExternalLink, ChevronUp } from 'lucide-react'
+import { Copy, ExternalLink, ChevronUp, Loader2, Zap, ZapOff, Play } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import NumberFlow from '@number-flow/react'
 import { useBoot } from '@/motion'
 import {
-  KAMETI_ADDRESS, KAMETI_ABI, CHAIN_ID, USDC,
+  KAMETI_ADDRESS, KAMETI_ABI, CHAIN_ID,
   formatAddress, formatUsdc, formatCountdown, explorerTx, explorerAddr,
 } from '@/lib/contract'
 import { friendlyError } from '@/lib/errors'
 import { buildShareLink } from '@/lib/share'
+import { useEip3009Sign } from '@/hooks/useEip3009'
+import { useInrRate } from '@/hooks/useLiveData'
 import type { KametiCircle, MemberInfo, RoundRecord } from '@/lib/types'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
-
 const STATUS_LABELS = ['OPEN', 'ACTIVE', 'COMPLETED'] as const
+const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 
 function ScoreBadge({ score }: { score: number }) {
   const tier = score >= 750 ? 'EXCELLENT' : score >= 650 ? 'GOOD' : score >= 550 ? 'FAIR' : 'POOR'
-  const bg   = score >= 650 ? 'bg-ink text-paper' : score >= 550 ? 'border border-line text-muted' : 'border border-signal text-signal'
-  return (
-    <span className={`label px-1.5 py-0.5 text-[9px] shrink-0 ${bg}`}>{score} {tier}</span>
-  )
+  const bg   = score >= 650 ? 'bg-ink text-paper' : score >= 550 ? 'border border-line text-muted' : 'border border-signal-ink/50 text-signal-ink'
+  return <span className={`label px-1.5 py-0.5 text-[9px] shrink-0 ${bg}`}>{score} {tier}</span>
 }
 
-// ─── Deposit bar ──────────────────────────────────────────────────────────────
-function DepositBar({ left, total }: { left: number; total: number }) {
-  const pct = total > 0 ? Math.round((left / total) * 100) : 0
+// ─── Deposit + lock bar ───────────────────────────────────────────────────────
+function ProtBar({ depositLeft, lockLeft, depositTotal, contribution, postWinLockBps }: {
+  depositLeft: bigint; lockLeft: bigint; depositTotal: number
+  contribution: bigint; postWinLockBps: number
+}) {
+  const dep  = Number(depositLeft) / 1e6
+  const lock = Number(lockLeft) / 1e6
+  const pct  = depositTotal > 0 ? Math.round((dep / depositTotal) * 100) : 0
+  const lockTotal = Number(contribution) / 1e6 * postWinLockBps / 10000
+
   return (
-    <div className="mt-2">
-      <div className="flex justify-between mb-1">
-        <span className="label text-[9px] text-muted">DEPOSIT</span>
-        <span className="label text-[9px] text-muted">{pct}%</span>
+    <div className="mt-2 space-y-1.5">
+      <div>
+        <div className="flex justify-between mb-0.5">
+          <span className="label text-[9px] text-muted">DEPOSIT</span>
+          <span className="label text-[9px] text-muted">{pct}%</span>
+        </div>
+        <div className="h-0.5 bg-line w-full">
+          <div className="h-full bg-signal transition-all" style={{ width: `${pct}%` }} />
+        </div>
       </div>
-      <div className="h-0.5 bg-line w-full">
-        <div className="h-full bg-signal transition-all" style={{ width: `${pct}%` }} />
-      </div>
+      {lock > 0 && lockTotal > 0 && (
+        <div>
+          <div className="flex justify-between mb-0.5">
+            <span className="label text-[9px] text-muted">POST-WIN LOCK</span>
+            <span className="label text-[9px] text-muted">{Math.round((lock / lockTotal) * 100)}%</span>
+          </div>
+          <div className="h-0.5 bg-line w-full">
+            <div className="h-full bg-signal-ink transition-all" style={{ width: `${Math.min(100, Math.round((lock / lockTotal) * 100))}%` }} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ─── Member cell ──────────────────────────────────────────────────────────────
 function MemberCell({
-  m, isYou, depositTotal, score,
+  m, isYou, depositTotal, score, contribution, postWinLockBps,
 }: {
   m: MemberInfo; isYou: boolean; depositTotal: number; score: number | undefined
+  contribution: bigint; postWinLockBps: number
 }) {
   const statusBlock = () => {
     if (m.defaulted) return <span className="label px-2 py-0.5 border border-line text-muted line-through">DEFAULTED{m.debt > 0n ? ` -${formatUsdc(m.debt)}` : ''}</span>
@@ -63,20 +84,28 @@ function MemberCell({
     <div className={`cell p-4 flex flex-col gap-2 ${isYou ? 'bg-paper-2' : ''}`}>
       <div className="flex items-center justify-between">
         <span className="font-display text-3xl font-bold">{m.seat}</span>
-        {m.autoPay && <span className="label px-1.5 py-0.5 bg-ink text-paper text-[9px]">AUTO</span>}
+        <div className="flex items-center gap-1">
+          {m.hasStoredAuth && <span className="label px-1.5 py-0.5 bg-signal text-on-signal text-[9px]">AUTO</span>}
+          {m.won && m.lockLeft > 0n && <span className="label px-1.5 py-0.5 bg-signal-ink text-paper text-[9px]">LOCKED</span>}
+        </div>
       </div>
       <span className="label font-bold truncate">{isYou ? 'YOU' : formatAddress(m.addr)}</span>
       {score !== undefined && <ScoreBadge score={score} />}
       {statusBlock()}
-      <DepositBar left={Number(m.depositLeft) / 1e6} total={depositTotal} />
+      <ProtBar
+        depositLeft={m.depositLeft}
+        lockLeft={m.lockLeft ?? 0n}
+        depositTotal={depositTotal}
+        contribution={contribution}
+        postWinLockBps={postWinLockBps}
+      />
     </div>
   )
 }
 
-// ─── Bid feed item ────────────────────────────────────────────────────────────
+// ─── Bid feed ─────────────────────────────────────────────────────────────────
 interface BidEntry { bidder: string; discount: bigint; block: bigint }
 
-// ─── Mini bar chart ───────────────────────────────────────────────────────────
 function DiscountChart({ history }: { history: RoundRecord[] }) {
   if (history.length === 0) return null
   const max = Math.max(...history.map(r => Number(r.discount))) || 1
@@ -95,6 +124,58 @@ function DiscountChart({ history }: { history: RoundRecord[] }) {
   )
 }
 
+// ─── AutoPay section ──────────────────────────────────────────────────────────
+function AutoPaySection({
+  circleId, isMember, me, maxMembers, currentRound, contribution, isPending, tx,
+  onStore,
+}: {
+  circleId: bigint; isMember: boolean; me: MemberInfo | undefined
+  maxMembers: number; currentRound: number; contribution: bigint
+  isPending: boolean; tx: (fn: string, args: unknown[], label: string) => void
+  onStore: () => void
+}) {
+  const hasAuth = me?.hasStoredAuth ?? false
+  const roundsLeft = maxMembers - currentRound + 1
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="label text-muted mb-1">AutoPay</p>
+      {isMember && !hasAuth && (
+        <div className="cell p-4 border border-signal-ink/20">
+          <p className="label text-sm mb-2">Pre-sign your remaining payments once. No gas each round.</p>
+          <p className="label text-muted text-[10px] mb-3">
+            Sign {roundsLeft} payment{roundsLeft !== 1 ? 's' : ''} — one signature each ({formatUsdc(contribution)} USDC each round).
+            Then one transaction to store them onchain.
+          </p>
+          <button
+            onClick={onStore}
+            disabled={isPending}
+            className="press cell py-2 px-4 bg-signal text-on-signal border border-ink label font-bold flex items-center gap-2 disabled:opacity-40 hover:bg-signal-hover"
+          >
+            <Zap size={12} />
+            {isPending ? <><Loader2 size={12} className="animate-spin" /> Storing…</> : `Turn on AutoPay (sign ${roundsLeft})`}
+          </button>
+        </div>
+      )}
+      {isMember && hasAuth && (
+        <div className="cell p-4 border border-signal/30 bg-signal/5">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="label px-2 py-0.5 bg-signal text-on-signal text-[9px]">AUTO ON</span>
+            <span className="label text-muted text-[10px]">Payments pre-signed</span>
+          </div>
+          <button
+            onClick={() => tx('revokeAutoPay', [circleId], 'AutoPay off')}
+            disabled={isPending}
+            className="press cell py-2 px-4 border border-line label text-muted flex items-center gap-2 disabled:opacity-40"
+          >
+            <ZapOff size={12} /> Turn off AutoPay
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CirclePage() {
   const { id } = useParams<{ id: string }>()
@@ -105,12 +186,15 @@ export default function CirclePage() {
   const { address, chainId } = useAccount()
   const { switchChain } = useSwitchChain()
   const publicClient = usePublicClient({ chainId: CHAIN_ID })
+  const { signRoundAuth, signDepositAuth } = useEip3009Sign()
+  const inrRate = useInrRate()
 
-  const [shareUrl, setShareUrl]       = useState('')
-  const [bidAmount, setBidAmount]     = useState('')
-  const [bidFeed, setBidFeed]         = useState<BidEntry[]>([])
+  const [shareUrl, setShareUrl]         = useState('')
+  const [bidAmount, setBidAmount]       = useState('')
+  const [bidFeed, setBidFeed]           = useState<BidEntry[]>([])
   const [memberScores, setMemberScores] = useState<Record<string, number>>({})
-  const [myClaimable, setMyClaimable] = useState<bigint>(0n)
+  const [myClaimable, setMyClaimable]   = useState<bigint>(0n)
+  const [isSigning, setIsSigning]       = useState(false)
 
   useEffect(() => { void buildShareLink(`/k/${id}`).then(setShareUrl) }, [id])
 
@@ -127,21 +211,13 @@ export default function CirclePage() {
     address: KAMETI_ADDRESS, abi: KAMETI_ABI,
     functionName: 'getRoundHistory', args: [circleId], chainId: CHAIN_ID,
   })
-  const { data: allowanceRaw, refetch: refetchAllowance } = useReadContract({
-    address: USDC.address as `0x${string}`, abi: erc20Abi,
-    functionName: 'allowance', args: [address ?? '0x0', KAMETI_ADDRESS], chainId: CHAIN_ID,
-    query: { enabled: !!address },
-  })
 
   const circle  = rawCircle as [KametiCircle['params'], number, number, bigint, bigint, string, bigint] | undefined
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const members = (rawMembers ?? []) as MemberInfo[]
-  // Stable list of addresses for useCallback deps (avoids infinite re-render from array identity)
   const memberAddrs = members.map(m => m.addr).join(',')
-  const n    = members.length
+  const n       = members.length
   const history = (rawHistory ?? []) as RoundRecord[]
 
-  // Decode tuple return of getCircle
   const params         = circle?.[0]
   const status         = circle?.[1] ?? 0
   const currentRound   = circle?.[2] ?? 0
@@ -151,21 +227,19 @@ export default function CirclePage() {
 
   const maxMembers     = Number(params?.maxMembers ?? 0)
   const contribution   = params?.contribution ?? 0n
-  const _roundDuration  = Number(params?.roundDuration ?? 0n); void _roundDuration
   const maxDiscountBps = Number(params?.maxDiscountBps ?? 0)
   const depositMul     = Number(params?.depositMultiplier ?? 1)
+  const postWinLockBps = Number(params?.postWinLockBps ?? 0)
+  const keeperTipBps   = Number(params?.keeperTipBps ?? 0)
 
   const pot  = contribution * BigInt(n || 1)
   const depositTotal = Number(contribution) / 1e6 * depositMul
 
-  const myIdx        = address ? members.findIndex(m => m.addr.toLowerCase() === address.toLowerCase()) : -1
-  const isMember     = myIdx >= 0
-  const me           = isMember ? members[myIdx] : undefined
-  const alreadyPaid  = me?.paidThisRound ?? false
-  const allowance    = allowanceRaw ?? 0n
-  const needsApprove = allowance < contribution
+  const myIdx      = address ? members.findIndex(m => m.addr.toLowerCase() === address.toLowerCase()) : -1
+  const isMember   = myIdx >= 0
+  const me         = isMember ? members[myIdx] : undefined
+  const alreadyPaid = me?.paidThisRound ?? false
 
-  // Bid eligibility
   const minNextBid = Number(highestDiscount) + Math.max(1, Number(pot) / 100)
   const maxBid     = Number(pot) * maxDiscountBps / 10000
   const canBid     = isMember && !!me && alreadyPaid && !me.won && !me.defaulted
@@ -177,12 +251,18 @@ export default function CirclePage() {
     me?.defaulted ? 'defaulted — not eligible' :
     eligibleCount <= 1 ? 'last eligible — takes pot at 0' : null
 
-  // Phase
-  const now         = Math.floor(Date.now() / 1000)
+  const [nowSec, setNowSec] = useState(() => Math.floor(performance.timeOrigin / 1000 + performance.now() / 1000))
+  useEffect(() => {
+    const t = setInterval(() => setNowSec(Math.floor(performance.timeOrigin / 1000 + performance.now() / 1000)), 5000)
+    return () => clearInterval(t)
+  }, [])
   const roundActive = status === 1
-  const payPhase    = roundActive && now < roundEnd
-  const bidPhase    = roundActive && now < roundEnd
-  const settlePhase = roundActive && now >= roundEnd
+  const payPhase    = roundActive && nowSec < roundEnd
+  const bidPhase    = roundActive && nowSec < roundEnd
+  const settlePhase = roundActive && nowSec >= roundEnd
+
+  // Keeper tip amount
+  const keeperTip = keeperTipBps > 0 ? Number(pot) * keeperTipBps / 10000 / 1e6 : 0
 
   // ── Fetch bid events ──────────────────────────────────────────────────────
   const fetchBids = useCallback(async () => {
@@ -194,15 +274,11 @@ export default function CirclePage() {
         args: { id: circleId },
         fromBlock: 'earliest', toBlock: 'latest',
       })
-      const entries: BidEntry[] = logs
-        .filter(l => l.args.round === currentRound)
-        .map(l => ({
-          bidder:   l.args.bidder ?? '',
-          discount: l.args.discount ?? 0n,
-          block:    l.blockNumber ?? 0n,
-        }))
-        .reverse()
-      setBidFeed(entries.slice(0, 10))
+      setBidFeed(
+        logs.filter(l => l.args.round === currentRound)
+            .map(l => ({ bidder: l.args.bidder ?? '', discount: l.args.discount ?? 0n, block: l.blockNumber ?? 0n }))
+            .reverse().slice(0, 10)
+      )
     } catch { /* ignore */ }
   }, [publicClient, circleId, currentRound, roundActive])
 
@@ -234,50 +310,161 @@ export default function CirclePage() {
     } catch { /* ignore */ }
   }, [publicClient, address])
 
-  useEffect(() => { void fetchBids() }, [fetchBids])
-  useEffect(() => { void fetchScores() }, [fetchScores])
-  useEffect(() => { void fetchClaimable() }, [fetchClaimable])
+  useEffect(() => {
+    let alive = true
+    fetchBids().then(() => { if (!alive) return }).catch(() => null)
+    return () => { alive = false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchBids])
+  useEffect(() => {
+    let alive = true
+    fetchScores().then(() => { if (!alive) return }).catch(() => null)
+    return () => { alive = false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchScores])
+  useEffect(() => {
+    let alive = true
+    fetchClaimable().then(() => { if (!alive) return }).catch(() => null)
+    return () => { alive = false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchClaimable])
 
   // ── Transactions ──────────────────────────────────────────────────────────
   const { writeContract, data: hash, isPending } = useWriteContract()
   const { isSuccess: txSuccess } = useWaitForTransactionReceipt({ hash })
 
   useEffect(() => {
-    if (txSuccess) {
-      void refetchCircle()
-      void refetchMembers()
-      void refetchAllowance()
-      void fetchBids()
-      void fetchClaimable()
-    }
-  }, [txSuccess, refetchCircle, refetchMembers, refetchAllowance, fetchBids, fetchClaimable])
+    if (!txSuccess) return
+    refetchCircle().catch(() => null)
+    refetchMembers().catch(() => null)
+    fetchBids().catch(() => null)
+    fetchClaimable().catch(() => null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txSuccess])
 
   const isWrongChain = address && chainId !== CHAIN_ID
 
   const tx = (fn: string, args: unknown[], label: string) => {
     if (!address) { toast.error('Connect your wallet'); return }
     if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
-    writeContract({
-      address: KAMETI_ADDRESS, abi: KAMETI_ABI,
-      functionName: fn, args, chainId: CHAIN_ID,
-    }, {
-      onSuccess: (h) => toast.success(`${label} confirmed!`, {
-        description: <a href={explorerTx(h)} target="_blank" rel="noopener" className="underline label">View tx →</a>,
-      }),
-      onError: (e) => toast.error(friendlyError(e)),
-    })
+    writeContract(
+      { address: KAMETI_ADDRESS, abi: KAMETI_ABI, functionName: fn, args, chainId: CHAIN_ID },
+      {
+        onSuccess: (h) => toast.success(`${label} confirmed!`, {
+          description: <a href={explorerTx(h)} target="_blank" rel="noopener" className="underline label">View tx →</a>,
+        }),
+        onError: (e) => toast.error(friendlyError(e)),
+      }
+    )
   }
 
-  const txApprove = (amount: bigint) => {
-    if (!address) return
+  // ── Join with EIP-3009 deposit authorization ──────────────────────────────
+  const handleJoin = async () => {
+    if (!address) { toast.error('Connect your wallet'); return }
     if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
-    writeContract({
-      address: USDC.address as `0x${string}`, abi: erc20Abi,
-      functionName: 'approve', args: [KAMETI_ADDRESS, amount], chainId: CHAIN_ID,
-    }, {
-      onSuccess: () => { toast.success('Approved'); void refetchAllowance() },
-      onError: (e) => toast.error(friendlyError(e)),
-    })
+    if (!publicClient) { toast.error('Client not ready'); return }
+    const depositRaw = contribution * BigInt(depositMul)
+    setIsSigning(true)
+    try {
+      toast.info('Sign the deposit authorization in your wallet…')
+      const sig = await signDepositAuth(circleId, depositRaw)
+      toast.info('Submitting join transaction…')
+      writeContract(
+        {
+          address: KAMETI_ADDRESS, abi: KAMETI_ABI,
+          functionName: 'joinWithAuthorization',
+          args: [circleId, depositRaw, 0n, sig.validBefore, sig.nonce, sig.v, sig.r, sig.s],
+          chainId: CHAIN_ID,
+        },
+        {
+          onSuccess: (h) => toast.success('Joined!', {
+            description: <a href={explorerTx(h)} target="_blank" rel="noopener" className="underline label">View tx →</a>,
+          }),
+          onError: (e) => toast.error(friendlyError(e)),
+        }
+      )
+    } catch (e) {
+      toast.error(friendlyError(e))
+    } finally {
+      setIsSigning(false)
+    }
+  }
+
+  // ── Pay this round with EIP-3009 ──────────────────────────────────────────
+  const handlePay = async () => {
+    if (!address) { toast.error('Connect your wallet'); return }
+    if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
+    setIsSigning(true)
+    try {
+      toast.info('Sign the round payment in your wallet…')
+      const sig = await signRoundAuth(circleId, currentRound, contribution)
+      toast.info('Submitting payment…')
+      writeContract(
+        {
+          address: KAMETI_ADDRESS, abi: KAMETI_ABI,
+          functionName: 'payWithAuthorization',
+          args: [circleId, 0n, sig.validBefore, sig.nonce, sig.v, sig.r, sig.s],
+          chainId: CHAIN_ID,
+        },
+        {
+          onSuccess: (h) => toast.success('Paid!', {
+            description: <a href={explorerTx(h)} target="_blank" rel="noopener" className="underline label">View tx →</a>,
+          }),
+          onError: (_e) => {
+            // Fallback: plain pay()
+            toast.warning('EIP-3009 rejected — trying plain pay()…')
+            tx('pay', [circleId], 'Paid')
+          },
+        }
+      )
+    } catch {
+      toast.warning('Signing failed — trying plain pay()…')
+      tx('pay', [circleId], 'Paid')
+    } finally {
+      setIsSigning(false)
+    }
+  }
+
+  // ── Store AutoPay authorizations ──────────────────────────────────────────
+  const handleStoreAutoPay = async () => {
+    if (!address) { toast.error('Connect your wallet'); return }
+    if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
+    setIsSigning(true)
+    try {
+      const roundsLeft = maxMembers - currentRound + 1
+      const sigs: { validBefore: bigint; nonce: Hex; v: number; r: Hex; s: Hex }[] = []
+      for (let r = currentRound; r <= maxMembers; r++) {
+        toast.info(`Sign payment ${r - currentRound + 1} of ${roundsLeft}…`)
+        const sig = await signRoundAuth(circleId, r, contribution)
+        sigs.push({ validBefore: sig.validBefore, nonce: sig.nonce, v: sig.v, r: sig.r, s: sig.s })
+      }
+      toast.info('Storing authorizations onchain…')
+      writeContract(
+        {
+          address: KAMETI_ADDRESS, abi: KAMETI_ABI,
+          functionName: 'storeAuthorizations',
+          args: [
+            circleId,
+            sigs.map(s => s.validBefore),
+            sigs.map(s => s.nonce),
+            sigs.map(s => s.v),
+            sigs.map(s => s.r),
+            sigs.map(s => s.s),
+          ],
+          chainId: CHAIN_ID,
+        },
+        {
+          onSuccess: (h) => toast.success('AutoPay active!', {
+            description: <a href={explorerTx(h)} target="_blank" rel="noopener" className="underline label">View tx →</a>,
+          }),
+          onError: (e) => toast.error(friendlyError(e)),
+        }
+      )
+    } catch (e) {
+      toast.error(friendlyError(e))
+    } finally {
+      setIsSigning(false)
+    }
   }
 
   if (!circle) {
@@ -290,6 +477,7 @@ export default function CirclePage() {
 
   const roundProgress = status === 1 && maxMembers > 0 ? ((currentRound - 1) / maxMembers) * 100 : 0
   const circleName    = params?.name ?? `Circle #${id}`
+  const inrPot        = inrRate > 0 ? Number(pot) / 1e6 * inrRate : null
 
   return (
     <div ref={pageRef} className="pt-12 min-h-screen overflow-x-hidden">
@@ -299,21 +487,24 @@ export default function CirclePage() {
         <div className="cell p-6 md:p-10 grid grid-cols-1 md:grid-cols-2 gap-6 items-start" data-boot>
           <div>
             <div className="flex items-center gap-3 mb-3 flex-wrap">
-              <span className={`label px-2 py-0.5 shrink-0 ${status === 0 ? 'border border-line text-muted' : status === 1 ? 'bg-signal text-on-signal' : 'bg-ink text-paper'}`}>
+              <span className={`label px-2 py-0.5 shrink-0 ${status === 0 ? 'border border-line text-muted' : status === 1 ? 'bg-signal text-on-signal border border-ink' : 'bg-ink text-paper'}`}>
                 {status === 1 ? `ROUND ${currentRound} OF ${maxMembers}` : STATUS_LABELS[status] ?? 'UNKNOWN'}
               </span>
               <span className="label text-muted">#{id}</span>
               {params?.minScore ? <span className="label text-muted">Score ≥{params.minScore}</span> : null}
+              {keeperTipBps > 0 && <span className="label text-muted">Keeper {keeperTipBps / 100}%</span>}
             </div>
             <h1 className="font-display text-4xl md:text-5xl font-bold">{circleName}</h1>
-            <p className="label text-muted mt-2">{n}/{maxMembers} members · {depositMul}× deposit</p>
+            <p className="label text-muted mt-2">{n}/{maxMembers} members · {depositMul}× deposit · {postWinLockBps / 100}% post-win lock</p>
           </div>
           <div className="flex flex-col items-start md:items-end gap-2">
             <p className="label text-muted">Pot this round</p>
             <p className="font-display text-5xl md:text-6xl font-bold">
               <NumberFlow value={Number(pot) / 1e6} format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }} />
             </p>
-            <p className="label text-muted">USDC</p>
+            <p className="label text-muted">
+              USDC{inrPot ? ` · ≈ ₹${inrPot.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : ''}
+            </p>
           </div>
         </div>
 
@@ -324,7 +515,7 @@ export default function CirclePage() {
               {(['PAY', 'BID', 'SETTLE'] as const).map((phase, i) => {
                 const active = (phase === 'PAY' && payPhase) || (phase === 'BID' && bidPhase) || (phase === 'SETTLE' && settlePhase)
                 return (
-                  <div key={phase} className={`cell px-4 py-2 label flex-1 text-center ${active ? 'bg-signal text-on-signal' : 'text-muted'}`}>
+                  <div key={phase} className={`cell px-4 py-2 label flex-1 text-center ${active ? 'bg-signal text-on-signal border-r border-ink' : 'text-muted'}`}>
                     {i + 1}. {phase}
                   </div>
                 )
@@ -340,19 +531,17 @@ export default function CirclePage() {
           </div>
         )}
 
-        {/* ── Auction panel (only when Active) ─────────────────────────── */}
+        {/* ── Auction panel ─────────────────────────────────────────────── */}
         {status === 1 && (
           <div className="cell p-6 md:p-10" data-boot>
             <p className="label text-muted mb-4">Auction · Round {currentRound}</p>
             <div className="frame grid grid-cols-1 md:grid-cols-2 gap-0">
-
-              {/* Current bid */}
               <div className="cell p-6 flex flex-col gap-3">
-                {highestBidder && highestBidder !== '0x0000000000000000000000000000000000000000' ? (
+                {highestBidder && highestBidder !== ZERO_ADDR ? (
                   <>
                     <div>
                       <p className="label text-muted mb-1">Highest Bid</p>
-                      <p className="font-display text-4xl font-bold text-signal">
+                      <p className="font-display text-4xl font-bold text-signal-ink">
                         <NumberFlow value={Number(highestDiscount) / 1e6} format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }} /> USDC
                       </p>
                       <p className="label text-muted mt-1">
@@ -370,7 +559,7 @@ export default function CirclePage() {
                       {n > 1 && (
                         <div className="flex justify-between">
                           <span className="label text-muted">Each other earns</span>
-                          <span className="label text-signal font-bold">
+                          <span className="label text-signal-ink font-bold">
                             +<NumberFlow value={Number(highestDiscount) / 1e6 / (n - 1)}
                               format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }} /> USDC
                           </span>
@@ -386,7 +575,6 @@ export default function CirclePage() {
                 )}
               </div>
 
-              {/* Place bid */}
               <div className="cell p-6 flex flex-col gap-4">
                 {eligibleCount <= 1 ? (
                   <p className="label text-muted">Only one eligible winner — no auction this round.</p>
@@ -396,8 +584,7 @@ export default function CirclePage() {
                       <p className="label text-muted mb-2">Your Bid (USDC discount)</p>
                       <div className="flex gap-0">
                         <input
-                          type="number"
-                          value={bidAmount}
+                          type="number" value={bidAmount}
                           onChange={e => setBidAmount(e.target.value)}
                           placeholder={(minNextBid / 1e6).toFixed(2)}
                           min={0} step={0.01}
@@ -436,7 +623,6 @@ export default function CirclePage() {
                   </p>
                 )}
 
-                {/* Live bid feed */}
                 {bidFeed.length > 0 && (
                   <div className="border-t border-line pt-3">
                     <p className="label text-muted mb-2 text-[10px]">Recent Bids</p>
@@ -472,47 +658,39 @@ export default function CirclePage() {
                 )
               }
               return (
-                <MemberCell
-                  key={i}
-                  m={m}
+                <MemberCell key={i} m={m}
                   isYou={!!address && m.addr.toLowerCase() === address.toLowerCase()}
                   depositTotal={depositTotal}
                   score={memberScores[m.addr.toLowerCase()]}
+                  contribution={contribution}
+                  postWinLockBps={postWinLockBps}
                 />
               )
             })}
           </div>
         </div>
 
-        {/* ── Actions + My balance ─────────────────────────────────────────── */}
+        {/* ── Actions ─────────────────────────────────────────────────────── */}
         <div className="cell p-6 md:p-10 grid grid-cols-1 md:grid-cols-3 gap-8" data-boot>
 
-          {/* Primary actions */}
           <div className="flex flex-col gap-3 md:col-span-2">
             <p className="label text-muted mb-1">Actions</p>
             {!address && <p className="label text-muted">Connect your wallet to interact.</p>}
             {isWrongChain && (
               <button onClick={() => switchChain({ chainId: CHAIN_ID })}
-                className="press cell py-3 px-6 bg-signal text-on-signal label">Switch to Arc Testnet</button>
+                className="press cell py-3 px-6 bg-signal text-on-signal border border-ink label">Switch to Arc Testnet</button>
             )}
 
             {/* Join */}
             {address && status === 0 && !isMember && (
-              <>
-                {needsApprove ? (
-                  <button onClick={() => txApprove(contribution * BigInt(depositMul) * 10n)}
-                    disabled={isPending}
-                    className="press cell py-3 px-6 border border-ink label disabled:opacity-40">
-                    {isPending ? 'Confirm…' : `Approve deposit (${formatUsdc(contribution * BigInt(depositMul))} USDC)`}
-                  </button>
-                ) : (
-                  <button onClick={() => tx('join', [circleId], 'Joined')}
-                    disabled={isPending}
-                    className="press cell py-3 px-6 bg-ink text-paper label disabled:opacity-40">
-                    {isPending ? 'Confirm…' : `Join — lock ${formatUsdc(contribution * BigInt(depositMul))} USDC deposit`}
-                  </button>
-                )}
-              </>
+              <button
+                onClick={() => { void handleJoin() }}
+                disabled={isPending || isSigning}
+                className="press cell py-3 px-6 bg-signal text-on-signal border border-ink label font-bold flex items-center justify-center gap-2 hover:bg-signal-hover disabled:opacity-40">
+                {isSigning ? <><Loader2 size={14} className="animate-spin" /> Sign deposit…</> :
+                 isPending ? 'Confirm…' :
+                 `Join — sign ${formatUsdc(contribution * BigInt(depositMul))} USDC deposit`}
+              </button>
             )}
             {address && status === 0 && isMember && (
               <>
@@ -527,86 +705,84 @@ export default function CirclePage() {
 
             {/* Pay this round */}
             {address && status === 1 && isMember && !alreadyPaid && !me?.defaulted && (
-              <>
-                {needsApprove ? (
-                  <button onClick={() => txApprove(contribution * 20n)}
-                    disabled={isPending}
-                    className="press cell py-3 px-6 border border-ink label disabled:opacity-40">
-                    {isPending ? 'Confirm…' : `Approve ${formatUsdc(contribution)} USDC`}
-                  </button>
-                ) : (
-                  <button onClick={() => tx('pay', [circleId], 'Paid')}
-                    disabled={isPending}
-                    className="press cell py-3 px-6 bg-ink text-paper label font-bold disabled:opacity-40">
-                    {isPending ? 'Confirm…' : `Pay ${formatUsdc(contribution)} USDC this round`}
-                  </button>
-                )}
-              </>
+              <button
+                onClick={() => { void handlePay() }}
+                disabled={isPending || isSigning}
+                className="press cell py-3 px-6 bg-signal text-on-signal border border-ink label font-bold flex items-center justify-center gap-2 hover:bg-signal-hover disabled:opacity-40">
+                {isSigning ? <><Loader2 size={14} className="animate-spin" /> Sign payment…</> :
+                 isPending ? 'Confirm…' :
+                 `Pay ${formatUsdc(contribution)} USDC this round`}
+              </button>
             )}
             {address && status === 1 && isMember && alreadyPaid && !me?.won && (
-              <p className="label px-2 py-1 border border-signal/40 text-muted">
-                ✓ Paid this round — waiting for others or auction end.
+              <p className="label px-2 py-1 border border-signal/40 bg-signal/5 text-muted">
+                Paid this round — waiting for others or auction end.
               </p>
             )}
 
-            {/* Settle — anyone can call */}
+            {/* Settle — anyone can call, shows keeper tip */}
             {address && status === 1 && (
               <button onClick={() => tx('settleRound', [circleId], 'Round settled')}
                 disabled={isPending}
-                className="press cell py-3 px-6 border border-ink label disabled:opacity-40">
-                {isPending ? 'Confirm…' : 'Settle Round (anyone can call after deadline)'}
+                className="press cell py-3 px-6 border border-ink label flex items-center gap-2 disabled:opacity-40">
+                <Play size={12} />
+                {isPending ? 'Confirm…' : `Settle Round${keeperTip > 0 ? ` (earn ${keeperTip.toFixed(4)} USDC tip)` : ' (anyone can call after deadline)'}`}
               </button>
             )}
 
-            {/* AutoPay for everyone */}
+            {/* Run AutoPay for everyone */}
             {address && status === 1 && (
-              <button onClick={() => tx('payAllAutoPay', [circleId], 'AutoPay executed')}
+              <button onClick={() => tx('executeAutoPay', [circleId], 'AutoPay executed')}
                 disabled={isPending}
-                className="press cell py-3 px-6 border border-line label text-muted disabled:opacity-40">
-                {isPending ? 'Confirm…' : '⚡ Run AutoPay for Everyone'}
+                className="press cell py-3 px-6 border border-line label text-muted flex items-center gap-2 disabled:opacity-40">
+                <Zap size={12} />
+                {isPending ? 'Confirm…' : 'Run AutoPay for Everyone (execute stored auths)'}
               </button>
-            )}
-
-            {/* My AutoPay toggle */}
-            {address && status === 1 && isMember && (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => {
-                    const enabling = !me?.autoPay
-                    if (enabling && needsApprove) { txApprove(contribution * BigInt(maxMembers) * 2n); return }
-                    tx('setAutoPay', [circleId, enabling], enabling ? 'AutoPay on' : 'AutoPay off')
-                  }}
-                  className={`press cell px-4 py-2 label ${me?.autoPay ? 'bg-ink text-paper' : 'border border-line text-muted'}`}>
-                  {me?.autoPay ? '⚡ AutoPay ON' : '⚡ AutoPay OFF'}
-                </button>
-                <span className="label text-muted text-[10px]">
-                  {me?.autoPay ? 'will pay automatically each round' : 'toggle to pay automatically'}
-                </span>
-              </div>
             )}
           </div>
 
-          {/* My balance + withdraw */}
-          <div className="flex flex-col gap-3">
+          {/* My balance + AutoPay + withdraw */}
+          <div className="flex flex-col gap-4">
             <p className="label text-muted mb-1">My Balance</p>
             <div className="cell p-5">
               <p className="label text-muted mb-1">Claimable</p>
               <p className="font-display text-3xl font-bold">
                 <NumberFlow value={Number(myClaimable) / 1e6} format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }} />
               </p>
-              <p className="label text-muted">USDC</p>
+              <p className="label text-muted">
+                USDC{inrRate > 0 && myClaimable > 0n ? ` · ≈ ₹${(Number(myClaimable) / 1e6 * inrRate).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : ''}
+              </p>
             </div>
             {myClaimable > 0n && (
               <button onClick={() => tx('withdraw', [], 'Withdrawn')}
                 disabled={isPending}
-                className="press cell py-3 px-6 bg-signal text-on-signal label font-bold disabled:opacity-40">
+                className="press cell py-3 px-6 bg-signal text-on-signal border border-ink label font-bold disabled:opacity-40 hover:bg-signal-hover">
                 {isPending ? 'Confirm…' : `Withdraw ${formatUsdc(myClaimable)} USDC`}
               </button>
+            )}
+
+            {/* Protection summary for won members */}
+            {me?.won && (me.lockLeft ?? 0n) > 0n && (
+              <div className="cell p-4 border border-signal-ink/20">
+                <p className="label text-muted mb-1 text-[10px]">POST-WIN LOCK ACTIVE</p>
+                <p className="label text-ink font-bold">{formatUsdc(me.lockLeft ?? 0n)} USDC</p>
+                <p className="label text-muted text-[10px] mt-0.5">released when you pay each future round on time</p>
+              </div>
+            )}
+
+            {/* AutoPay section */}
+            {isMember && status === 1 && (
+              <AutoPaySection
+                circleId={circleId} isMember={isMember} me={me}
+                maxMembers={maxMembers} currentRound={currentRound} contribution={contribution}
+                isPending={isPending || isSigning} tx={tx}
+                onStore={() => { void handleStoreAutoPay() }}
+              />
             )}
           </div>
         </div>
 
-        {/* ── Round history + chart ─────────────────────────────────────── */}
+        {/* ── Round history ─────────────────────────────────────────────── */}
         {history.length > 0 && (
           <div className="cell p-6 md:p-10" data-boot>
             <p className="label text-muted mb-4">Round History</p>
@@ -628,7 +804,7 @@ export default function CirclePage() {
                           className="link-line text-muted">{formatAddress(r.winner)}</a>
                       </td>
                       <td className="label px-3 py-3">{formatUsdc(r.pot)}</td>
-                      <td className="label px-3 py-3 text-signal">{formatUsdc(r.discount)}</td>
+                      <td className="label px-3 py-3 text-signal-ink">{formatUsdc(r.discount)}</td>
                       <td className="label px-3 py-3">+{formatUsdc(r.dividendPerMember)}</td>
                     </tr>
                   ))}
@@ -673,3 +849,5 @@ export default function CirclePage() {
     </div>
   )
 }
+
+

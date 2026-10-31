@@ -9,7 +9,7 @@ export const ARC_CHAIN = requireChain(CHAIN_ID)
 export const USDC = getUsdc(CHAIN_ID)!
 
 export const KAMETI_ADDRESS = (
-  import.meta.env.VITE_CONTRACT_ADDRESS ?? '0x8a6ed216d5c38f0a35f97c327d79e4d456c9db6c'
+  import.meta.env.VITE_CONTRACT_ADDRESS ?? '0x34f31472c5d16e0562668fbea1e700b19b2ea5a7'
 ) as `0x${string}`
 
 export const KAMETI_ABI = metadata.abi
