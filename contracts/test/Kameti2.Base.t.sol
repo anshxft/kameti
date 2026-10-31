@@ -3,22 +3,29 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Kameti} from "../Kameti.sol";
-import {MockERC20} from "../test-helpers/MockERC20.sol";
+import {MockUSDC3009} from "../test-helpers/MockUSDC3009.sol";
 
-/// @dev Shared base for all Kameti v2 tests.
+/// @dev Shared base for all Kameti v3 tests.
 abstract contract Kameti2Base is Test {
-    // ── actors ────────────────────────────────────────────────────────────────
-    address internal alice   = makeAddr("alice");
-    address internal bob     = makeAddr("bob");
-    address internal carol   = makeAddr("carol");
-    address internal dave    = makeAddr("dave");
-    address internal creator = makeAddr("creator");
 
-    // ── token & contract ─────────────────────────────────────────────────────
-    MockERC20 internal usdc;
-    Kameti    internal kameti;
+    // ── actors (addresses + private keys for EIP-3009 signing) ──────────────────
+    uint256 internal alicePk;
+    uint256 internal bobPk;
+    uint256 internal carolPk;
+    uint256 internal creatorPk;
+    uint256 internal davePk;
 
-    // ── constants ─────────────────────────────────────────────────────────────
+    address internal alice;
+    address internal bob;
+    address internal carol;
+    address internal dave;
+    address internal creator;
+
+    // ── token & contract ─────────────────────────────────────────────────────────
+    MockUSDC3009 internal usdc;
+    Kameti        internal kameti;
+
+    // ── constants ─────────────────────────────────────────────────────────────────
     uint256 internal constant e6           = 1_000_000;
     uint256 internal constant CONTRIBUTION = 10 * e6;   // 10 USDC
     uint8   internal constant MAX_MEMBERS  = 4;
@@ -32,20 +39,28 @@ abstract contract Kameti2Base is Test {
     // deposit = contribution * depositMultiplier
     uint256 internal constant DEPOSIT = CONTRIBUTION * DEPOSIT_MUL;
 
-    // ── setUp ─────────────────────────────────────────────────────────────────
+    // ── setUp ─────────────────────────────────────────────────────────────────────
     function setUp() public virtual {
-        usdc   = new MockERC20("Mock USDC", "mUSDC", 6);
-        kameti = new Kameti(address(usdc));
+        // Derive addresses and private keys for EIP-3009 signing
+        (alice,   alicePk)   = makeAddrAndKey("alice");
+        (bob,     bobPk)     = makeAddrAndKey("bob");
+        (carol,   carolPk)   = makeAddrAndKey("carol");
+        (dave,    davePk)    = makeAddrAndKey("dave");
+        (creator, creatorPk) = makeAddrAndKey("creator");
+
+        usdc   = new MockUSDC3009();
+        kameti = new Kameti(address(usdc), address(0));
 
         address[5] memory actors = [alice, bob, carol, dave, creator];
         for (uint256 i = 0; i < actors.length; i++) {
             usdc.mint(actors[i], INITIAL_BAL);
+            // Approve for the approve-based join()/pay() tests
             vm.prank(actors[i]);
             usdc.approve(address(kameti), type(uint256).max);
         }
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────
+    // ── helpers ───────────────────────────────────────────────────────────────────
 
     /// @dev Create a 4-member circle with default params; creator pays deposit.
     function _createCircle4() internal returns (uint256 id) {
@@ -57,7 +72,9 @@ abstract contract Kameti2Base is Test {
             ROUND_DUR,
             DEPOSIT_MUL,
             MAX_DISC_BPS,
-            MIN_SCORE
+            MIN_SCORE,
+            0,   // postWinLockBps=0 keeps v2-era arithmetic exact
+            0    // keeperTipBps=0 keeps v2-era arithmetic exact
         );
     }
 
@@ -75,7 +92,9 @@ abstract contract Kameti2Base is Test {
             ROUND_DUR,
             depositMul,
             maxDiscBps,
-            minScore
+            minScore,
+            0,   // postWinLockBps=0
+            0    // keeperTipBps=0
         );
     }
 
@@ -149,5 +168,65 @@ abstract contract Kameti2Base is Test {
                 total += usdc.balanceOf(m[i]) - before;
             }
         }
+    }
+
+    // ── EIP-3009 signing helpers ──────────────────────────────────────────────────
+
+    /// @dev Sign a ReceiveWithAuthorization for the round-contribution nonce.
+    function _signReceive(
+        uint256 pk,
+        address from,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce
+    ) internal view returns (uint8 v, bytes32 r, bytes32 s) {
+        bytes32 structHash = keccak256(abi.encode(
+            keccak256("ReceiveWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)"),
+            from, to, value, validAfter, validBefore, nonce
+        ));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", usdc.DOMAIN_SEPARATOR(), structHash));
+        (v, r, s) = vm.sign(pk, digest);
+    }
+
+    /// @dev Sign a CancelAuthorization.
+    function _signCancel(
+        uint256 pk,
+        address authorizer,
+        bytes32 nonce
+    ) internal view returns (uint8 v, bytes32 r, bytes32 s) {
+        bytes32 structHash = keccak256(abi.encode(
+            keccak256("CancelAuthorization(address authorizer,bytes32 nonce)"),
+            authorizer, nonce
+        ));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", usdc.DOMAIN_SEPARATOR(), structHash));
+        (v, r, s) = vm.sign(pk, digest);
+    }
+
+    /// @dev Store authorization for `member` (via `pk`) for `round` in `circleId`.
+    function _storeAuth(
+        uint256 pk,
+        address member,
+        uint256 circleId,
+        uint8   round,
+        uint256 validBefore
+    ) internal {
+        bytes32 nonce = kameti.roundNonce(circleId, round, member);
+        (uint8 v, bytes32 r, bytes32 s) = _signReceive(
+            pk, member, address(kameti), CONTRIBUTION, 0, validBefore, nonce
+        );
+        uint8[]   memory rounds = new uint8[](1);
+        uint256[] memory vbs    = new uint256[](1);
+        uint8[]   memory vs     = new uint8[](1);
+        bytes32[] memory rs     = new bytes32[](1);
+        bytes32[] memory ss     = new bytes32[](1);
+        rounds[0] = round;
+        vbs[0]    = validBefore;
+        vs[0]     = v;
+        rs[0]     = r;
+        ss[0]     = s;
+        vm.prank(member);
+        kameti.storeAuthorizations(circleId, rounds, vbs, vs, rs, ss);
     }
 }

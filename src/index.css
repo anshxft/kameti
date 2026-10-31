@@ -11,7 +11,8 @@
 @tailwind utilities;
 
 /* ─── Cybercore palette ─────────────────────────────────────────────────────
-   Red is a SURFACE colour only. Text on red = ink (5.4:1). Never red text on paper. */
+   Mint (#7ffab7) is a SURFACE colour only. Text on mint = ink #0b0b0b.
+   --signal-ink is the accent for strokes/text on paper (WCAG 4.5:1). */
 :root {
   --paper: #e4e4e0;
   --paper-2: #d9d9d4;
@@ -20,7 +21,9 @@
   --muted: #5c5c58;
   --line: rgb(11 11 11 / 0.2);
   --line-strong: rgb(11 11 11 / 0.55);
-  --signal: #ff3b1f;
+  --signal: #7ffab7;
+  --signal-hover: #6ef0a8;
+  --signal-ink: #077543;   /* 4.5:1 on --paper in light mode */
   --on-signal: #0b0b0b;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -37,6 +40,7 @@
   --muted: #9a9a94;
   --line: rgb(232 232 227 / 0.16);
   --line-strong: rgb(232 232 227 / 0.5);
+  --signal-ink: #7ffab7;   /* mint itself is legible on dark paper */
   color-scheme: dark;
 }
 
@@ -60,7 +64,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--signal);
+  outline: 2px solid var(--signal-ink);
   outline-offset: 2px;
 }
 
@@ -139,7 +143,7 @@ body {
     position: absolute;
     left: 0; bottom: -2px;
     width: 100%; height: 1px;
-    background: var(--signal);
+    background: var(--signal-ink);
     transform: scaleX(0);
     transform-origin: left;
     transition: transform 220ms var(--ease-out);
@@ -154,7 +158,7 @@ body {
   .step .step-arrow {
     transition: transform 240ms var(--ease-out), color 200ms ease, opacity 200ms ease;
   }
-  .step:hover .step-num  { color: var(--signal); transform: translateX(6px); }
+  .step:hover .step-num  { color: var(--signal-ink); transform: translateX(6px); }
   .step:hover .step-copy { transform: translateY(-4px); }
   .step .step-arrow      { opacity: 0; transform: translate(-8px, 8px); }
   .step:hover .step-arrow { opacity: 1; transform: translate(0, 0); }

@@ -118,7 +118,7 @@ function ScorePanel({ addr }: { addr: string }) {
       <div className="cell p-8 flex flex-col items-center gap-4">
         <ScoreGauge score={s} />
         <div className="flex items-center gap-3">
-          <span className={`label px-3 py-1 ${s >= 650 ? 'bg-ink text-paper' : s >= 550 ? 'border border-line text-muted' : 'border border-signal text-signal'}`}>
+          <span className={`label px-3 py-1 ${s >= 650 ? 'bg-ink text-paper' : s >= 550 ? 'border border-line text-muted' : 'border border-signal-ink text-signal-ink-ink'}`}>
             {label}
           </span>
           <span className="label text-muted">{formatAddress(addr)}</span>
@@ -136,7 +136,7 @@ function ScorePanel({ addr }: { addr: string }) {
           ].map(st => (
             <div key={st.label} className="cell p-5">
               <p className="label text-muted mb-2">{st.label}</p>
-              <p className={`font-display text-3xl font-bold ${st.value > 0 && !st.good ? 'text-signal' : ''}`}>
+              <p className={`font-display text-3xl font-bold ${st.value > 0 && !st.good ? 'text-signal-ink' : ''}`}>
                 <NumberFlow value={st.value} />
               </p>
             </div>
@@ -158,8 +158,8 @@ function ScorePanel({ addr }: { addr: string }) {
           <p>Score = 600 (base)</p>
           <p className="text-ink">+ 5 × on-time payments</p>
           <p className="text-ink">+ 40 × circles completed</p>
-          <p className="text-signal">− 30 × strikes (missed, covered by deposit)</p>
-          <p className="text-signal">− 120 × defaults (deposit exhausted)</p>
+          <p className="text-signal-ink">− 30 × strikes (missed, covered by deposit)</p>
+          <p className="text-signal-ink">− 120 × defaults (deposit exhausted)</p>
           <p className="text-muted">Clamped to [300, 900]</p>
         </div>
       </div>

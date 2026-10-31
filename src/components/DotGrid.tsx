@@ -74,7 +74,7 @@ export default function DotGrid({ className = '' }: { className?: string }) {
           const t = Math.max(hoverT, rippleT)
           const base = isDark() ? 'rgb(232 232 227 / 0.18)' : 'rgb(11 11 11 / 0.18)'
           ctx.fillStyle = t > 0.01
-            ? `rgba(255,59,31,${0.18 + t * 0.82})`
+            ? `rgba(127,250,183,${0.18 + t * 0.82})`
             : base
           ctx.beginPath()
           ctx.arc(x, y, DOT_RADIUS, 0, Math.PI * 2)

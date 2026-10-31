@@ -5,7 +5,8 @@ import {Kameti2Base} from "./Kameti2.Base.t.sol";
 import {Kameti} from "../Kameti.sol";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// §18  RoundEnded fix — pay() reverts, payAllAutoPay() skips silently
+// §18  RoundEnded fix — pay() reverts after deadline,
+//      executeAutoPay() skips members whose deadline has passed (settlePath=false)
 // ─────────────────────────────────────────────────────────────────────────────
 contract Kameti2RoundEndedTest is Kameti2Base {
 
@@ -21,7 +22,6 @@ contract Kameti2RoundEndedTest is Kameti2Base {
 
     /// @dev Warp past the round deadline, then call pay() → expect RoundEnded().
     function test_Pay_AfterRoundEnd_Reverts() public {
-        // Advance time past the round end
         _warpPastRound(cId);
 
         vm.prank(alice);
@@ -29,32 +29,29 @@ contract Kameti2RoundEndedTest is Kameti2Base {
         kameti.pay(cId);
     }
 
-    // ── test 2: payAllAutoPay() after roundEnd must return silently ──────────
+    // ── test 2: executeAutoPay() after roundEnd skips silently ───────────────
 
-    /// @dev All members join with autopay ON and full allowance (already set in
-    ///      setUp via type(uint256).max approve).  After warping past roundEnd,
-    ///      payAllAutoPay() should return without reverting, no member should
-    ///      show paidThisRound = true, and no ContributionPaid event is emitted.
-    function test_PayAllAutoPay_AfterRoundEnd_SkipsSilently() public {
-        // Enable autopay for all four members
-        address[4] memory members = [creator, alice, bob, carol];
-        for (uint256 i = 0; i < 4; i++) {
-            vm.prank(members[i]);
-            kameti.setAutoPay(cId, true);
-        }
+    /// @dev Store authorizations for all members, then warp past roundEnd.
+    ///      executeAutoPay (non-settle path) should silently skip because
+    ///      block.timestamp >= roundEnd.  No ContributionPaid event, no state change.
+    function test_ExecuteAutoPay_AfterRoundEnd_SkipsSilently() public {
+        uint256 validBefore = block.timestamp + 2 days;
 
-        // Warp past the round end
+        // Store auths for all 4 members for round 1
+        _storeAuth(creatorPk, creator, cId, 1, validBefore);
+        _storeAuth(alicePk,   alice,   cId, 1, validBefore);
+        _storeAuth(bobPk,     bob,     cId, 1, validBefore);
+        _storeAuth(carolPk,   carol,   cId, 1, validBefore);
+
+        // Warp past round end
         _warpPastRound(cId);
 
-        // Expect NO ContributionPaid events for any member.
-        // We record event expectations that must NOT fire by asserting
-        // member states after the call instead (forge has no "expect no emit").
         uint256 contractBalBefore = usdc.balanceOf(address(kameti));
 
-        // This must not revert
-        kameti.payAllAutoPay(cId);
+        // executeAutoPay: settlePath=false, so it skips members past deadline
+        kameti.executeAutoPay(cId);
 
-        // Contract balance unchanged — no contributions pulled
+        // Contract balance unchanged
         assertEq(
             usdc.balanceOf(address(kameti)),
             contractBalBefore,
@@ -66,11 +63,10 @@ contract Kameti2RoundEndedTest is Kameti2Base {
         for (uint256 i = 0; i < infos.length; i++) {
             assertFalse(
                 infos[i].paidThisRound,
-                "no member should be marked paid after payAllAutoPay past roundEnd"
+                "no member should be marked paid after executeAutoPay past roundEnd"
             );
         }
 
-        // potAccumulated must still be zero
         (, , , , uint256 pot, ,) = kameti.getCircle(cId);
         assertEq(pot, 0, "potAccumulated must remain zero");
     }

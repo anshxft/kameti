@@ -16,8 +16,10 @@ export default {
         muted:       'var(--muted)',
         line:        'var(--line)',
         'line-strong': 'var(--line-strong)',
-        signal:      'var(--signal)',
-        'on-signal': 'var(--on-signal)',
+        signal:        'var(--signal)',
+        'signal-hover':'var(--signal-hover)',
+        'signal-ink':  'var(--signal-ink)',
+        'on-signal':   'var(--on-signal)',
       },
       fontFamily: {
         display: ['"Tektur Variable"', '"Space Grotesk Variable"', 'sans-serif'],

@@ -28,7 +28,7 @@ contract Kameti2FuzzTest is Kameti2Base {
 
         vm.prank(creator);
         uint256 id = kameti.createCircle(
-            "fuzz", contribution, maxMembers, ROUND_DUR, depositMul, maxDiscBps, 0
+            "fuzz", contribution, maxMembers, ROUND_DUR, depositMul, maxDiscBps, 0, 0, 0
         );
 
         (Kameti.CircleParams memory p, Kameti.CircleStatus st, , , , ,) = kameti.getCircle(id);
@@ -63,7 +63,7 @@ contract Kameti2FuzzTest is Kameti2Base {
         vm.assume(badMembers < 3 || badMembers > 10);
         vm.prank(creator);
         vm.expectRevert(Kameti.InvalidParams.selector);
-        kameti.createCircle("fuzz-bad", CONTRIBUTION, badMembers, ROUND_DUR, 1, 0, 0);
+        kameti.createCircle("fuzz-bad", CONTRIBUTION, badMembers, ROUND_DUR, 1, 0, 0, 0, 0);
     }
 
     /// @dev createCircle rejects depositMultiplier outside [1,3].
@@ -71,7 +71,7 @@ contract Kameti2FuzzTest is Kameti2Base {
         vm.assume(badMul == 0 || badMul > 3);
         vm.prank(creator);
         vm.expectRevert(Kameti.InvalidParams.selector);
-        kameti.createCircle("fuzz-bad", CONTRIBUTION, 3, ROUND_DUR, badMul, 0, 0);
+        kameti.createCircle("fuzz-bad", CONTRIBUTION, 3, ROUND_DUR, badMul, 0, 0, 0, 0);
     }
 }
 
@@ -123,7 +123,7 @@ contract KametiHandler is StdInvariant, Test {
 
         // Create & fill 3-member circle with depositMul=1
         vm.prank(creator_);
-        circleId = _kameti.createCircle("inv", CONTRIBUTION_, 3, ROUND_DUR_, 1, 0, 0);
+        circleId = _kameti.createCircle("inv", CONTRIBUTION_, 3, ROUND_DUR_, 1, 0, 0, 0, 0);
 
         vm.prank(alice_);
         _kameti.join(circleId);
@@ -200,7 +200,7 @@ contract KametiInvariantTest is Test {
 
     function setUp() public {
         usdc   = new MockERC20("Mock USDC", "mUSDC", 6);
-        kameti = new Kameti(address(usdc));
+        kameti = new Kameti(address(usdc), address(0));
         handler = new KametiHandler(usdc, kameti);
 
         targetContract(address(handler));

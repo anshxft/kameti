@@ -1,13 +1,27 @@
 {
-  "contractAddress": "0x8a6ed216d5c38f0a35f97c327d79e4d456c9db6c",
+  "contractAddress": "0x34f31472c5d16e0562668fbea1e700b19b2ea5a7",
   "network": "ARC-TESTNET",
   "deployerWalletId": "3c2464b2-8369-52e2-a782-800bbeca5396",
   "contract_code_path": "/home/user/app/contracts/Kameti.sol",
   "contract_compiled_code_path": "/home/user/app/contracts/out/Kameti.sol/Kameti.json",
   "contract_network_and_links": {
-    "Arc Testnet": "https://explorer.testnet.arc.io/address/0x8a6ed216d5c38f0a35f97c327d79e4d456c9db6c"
+    "Arc Testnet": "https://explorer.testnet.arc.io/address/0x34f31472c5d16e0562668fbea1e700b19b2ea5a7"
   },
   "contract_deployments": [
+    {
+      "chain": "Arc Testnet",
+      "address": "0x34f31472c5d16e0562668fbea1e700b19b2ea5a7",
+      "explorerUrl": "https://explorer.testnet.arc.io/address/0x34f31472c5d16e0562668fbea1e700b19b2ea5a7",
+      "txHash": "0xb6c9973912b97432df80ee610d59318b37083771a964584251c06ec8055b14d0",
+      "deployedAt": "2026-10-27T18:24:17.219Z"
+    },
+    {
+      "chain": "Arc Testnet",
+      "address": "0x41fb2089109136463bd5530e294b5be4620f15e5",
+      "explorerUrl": "https://explorer.testnet.arc.io/address/0x41fb2089109136463bd5530e294b5be4620f15e5",
+      "txHash": "0xbd33ee878482e27d36bd3c3ac27dc16c4ebe4ceff02599f713ad0ecac0c821e6",
+      "deployedAt": "2026-10-25T17:03:02.566Z"
+    },
     {
       "chain": "Arc Testnet",
       "address": "0x8a6ed216d5c38f0a35f97c327d79e4d456c9db6c",
@@ -38,8 +52,49 @@
           "name": "usdcAddress",
           "type": "address",
           "internalType": "address"
+        },
+        {
+          "name": "pqPrecompile",
+          "type": "address",
+          "internalType": "address"
         }
       ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "cancelPqDisable",
+      "inputs": [
+        {
+          "name": "sig",
+          "type": "bytes",
+          "internalType": "bytes"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "changePqGuard",
+      "inputs": [
+        {
+          "name": "newVk",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "newLimit",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "sig",
+          "type": "bytes",
+          "internalType": "bytes"
+        }
+      ],
+      "outputs": [],
       "stateMutability": "nonpayable"
     },
     {
@@ -54,7 +109,7 @@
       ],
       "outputs": [
         {
-          "name": "",
+          "name": "ids",
           "type": "uint256[]",
           "internalType": "uint256[]"
         }
@@ -118,6 +173,16 @@
           "name": "minScore",
           "type": "uint16",
           "internalType": "uint16"
+        },
+        {
+          "name": "postWinLockBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "keeperTipBps",
+          "type": "uint8",
+          "internalType": "uint8"
         }
       ],
       "outputs": [
@@ -127,6 +192,203 @@
           "internalType": "uint256"
         }
       ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "createCircleWithAuthorization",
+      "inputs": [
+        {
+          "name": "name",
+          "type": "string",
+          "internalType": "string"
+        },
+        {
+          "name": "contribution",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "maxMembers",
+          "type": "uint8",
+          "internalType": "uint8"
+        },
+        {
+          "name": "roundDuration",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "depositMultiplier",
+          "type": "uint8",
+          "internalType": "uint8"
+        },
+        {
+          "name": "maxDiscountBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "minScore",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "postWinLockBps",
+          "type": "uint16",
+          "internalType": "uint16"
+        },
+        {
+          "name": "keeperTipBps",
+          "type": "uint8",
+          "internalType": "uint8"
+        },
+        {
+          "name": "validBefore",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "nonce",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "v",
+          "type": "uint8",
+          "internalType": "uint8"
+        },
+        {
+          "name": "r",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "s",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "id",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "createDepositNonce",
+      "inputs": [
+        {
+          "name": "creator",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "nonce",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "createNonce",
+      "inputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "depositNonce",
+      "inputs": [
+        {
+          "name": "circleId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "member",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "nonce",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "disablePqGuard",
+      "inputs": [
+        {
+          "name": "sig",
+          "type": "bytes",
+          "internalType": "bytes"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "enablePqGuard",
+      "inputs": [
+        {
+          "name": "vk",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "dailyFreeLimit",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "executeAutoPay",
+      "inputs": [
+        {
+          "name": "circleId",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "finalizePqDisable",
+      "inputs": [],
+      "outputs": [],
       "stateMutability": "nonpayable"
     },
     {
@@ -179,6 +441,16 @@
               "name": "minScore",
               "type": "uint16",
               "internalType": "uint16"
+            },
+            {
+              "name": "postWinLockBps",
+              "type": "uint16",
+              "internalType": "uint16"
+            },
+            {
+              "name": "keeperTipBps",
+              "type": "uint8",
+              "internalType": "uint8"
             }
           ]
         },
@@ -217,6 +489,30 @@
     },
     {
       "type": "function",
+      "name": "getMemberAutoPay",
+      "inputs": [
+        {
+          "name": "circleId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "member",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "rounds",
+          "type": "uint8[]",
+          "internalType": "uint8[]"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
       "name": "getMembers",
       "inputs": [
         {
@@ -227,7 +523,7 @@
       ],
       "outputs": [
         {
-          "name": "",
+          "name": "infos",
           "type": "tuple[]",
           "internalType": "struct Kameti.MemberInfo[]",
           "components": [
@@ -243,6 +539,11 @@
             },
             {
               "name": "depositLeft",
+              "type": "uint256",
+              "internalType": "uint256"
+            },
+            {
+              "name": "lockLeft",
               "type": "uint256",
               "internalType": "uint256"
             },
@@ -272,7 +573,7 @@
               "internalType": "uint256"
             },
             {
-              "name": "autoPay",
+              "name": "hasStoredAuth",
               "type": "bool",
               "internalType": "bool"
             }
@@ -293,7 +594,7 @@
       ],
       "outputs": [
         {
-          "name": "",
+          "name": "records",
           "type": "tuple[]",
           "internalType": "struct Kameti.RoundRecord[]",
           "components": [
@@ -324,12 +625,74 @@
     },
     {
       "type": "function",
+      "name": "isReliable",
+      "inputs": [
+        {
+          "name": "who",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "minScore",
+          "type": "uint16",
+          "internalType": "uint16"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool",
+          "internalType": "bool"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
       "name": "join",
       "inputs": [
         {
           "name": "id",
           "type": "uint256",
           "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "joinWithAuthorization",
+      "inputs": [
+        {
+          "name": "circleId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "validBefore",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "nonce",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "v",
+          "type": "uint8",
+          "internalType": "uint8"
+        },
+        {
+          "name": "r",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "s",
+          "type": "bytes32",
+          "internalType": "bytes32"
         }
       ],
       "outputs": [],
@@ -363,30 +726,37 @@
     },
     {
       "type": "function",
-      "name": "payAllAutoPay",
+      "name": "payWithAuthorization",
       "inputs": [
         {
-          "name": "id",
-          "type": "uint256",
-          "internalType": "uint256"
-        }
-      ],
-      "outputs": [],
-      "stateMutability": "nonpayable"
-    },
-    {
-      "type": "function",
-      "name": "payFor",
-      "inputs": [
-        {
-          "name": "id",
+          "name": "circleId",
           "type": "uint256",
           "internalType": "uint256"
         },
         {
-          "name": "member",
+          "name": "from",
           "type": "address",
           "internalType": "address"
+        },
+        {
+          "name": "validBefore",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "v",
+          "type": "uint8",
+          "internalType": "uint8"
+        },
+        {
+          "name": "r",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "s",
+          "type": "bytes32",
+          "internalType": "bytes32"
         }
       ],
       "outputs": [],
@@ -412,6 +782,94 @@
     },
     {
       "type": "function",
+      "name": "protectionOf",
+      "inputs": [
+        {
+          "name": "circleId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "member",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "depositLeft",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "lockLeft",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "futureObligation",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "requestPqDisable",
+      "inputs": [],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "revokeAutoPay",
+      "inputs": [
+        {
+          "name": "circleId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "fromRound",
+          "type": "uint8",
+          "internalType": "uint8"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "roundNonce",
+      "inputs": [
+        {
+          "name": "circleId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "round",
+          "type": "uint8",
+          "internalType": "uint8"
+        },
+        {
+          "name": "member",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "nonce",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
       "name": "scoreOf",
       "inputs": [
         {
@@ -422,30 +880,12 @@
       ],
       "outputs": [
         {
-          "name": "",
+          "name": "score",
           "type": "uint16",
           "internalType": "uint16"
         }
       ],
       "stateMutability": "view"
-    },
-    {
-      "type": "function",
-      "name": "setAutoPay",
-      "inputs": [
-        {
-          "name": "id",
-          "type": "uint256",
-          "internalType": "uint256"
-        },
-        {
-          "name": "enabled",
-          "type": "bool",
-          "internalType": "bool"
-        }
-      ],
-      "outputs": [],
-      "stateMutability": "nonpayable"
     },
     {
       "type": "function",
@@ -472,9 +912,9 @@
       ],
       "outputs": [
         {
-          "name": "",
+          "name": "stats",
           "type": "tuple",
-          "internalType": "struct Kameti.ScoreStats",
+          "internalType": "struct IKametiScore.ScoreStats",
           "components": [
             {
               "name": "onTimePayments",
@@ -505,6 +945,44 @@
         }
       ],
       "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "storeAuthorizations",
+      "inputs": [
+        {
+          "name": "circleId",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "rounds",
+          "type": "uint8[]",
+          "internalType": "uint8[]"
+        },
+        {
+          "name": "validBefores",
+          "type": "uint256[]",
+          "internalType": "uint256[]"
+        },
+        {
+          "name": "vs",
+          "type": "uint8[]",
+          "internalType": "uint8[]"
+        },
+        {
+          "name": "rs",
+          "type": "bytes32[]",
+          "internalType": "bytes32[]"
+        },
+        {
+          "name": "ss",
+          "type": "bytes32[]",
+          "internalType": "bytes32[]"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
     },
     {
       "type": "function",
@@ -547,6 +1025,19 @@
     },
     {
       "type": "function",
+      "name": "totalKeeperTips",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
       "name": "totalPayouts",
       "inputs": [],
       "outputs": [
@@ -575,6 +1066,29 @@
       "type": "function",
       "name": "withdraw",
       "inputs": [],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "withdrawPq",
+      "inputs": [
+        {
+          "name": "to",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "amount",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "sig",
+          "type": "bytes",
+          "internalType": "bytes"
+        }
+      ],
       "outputs": [],
       "stateMutability": "nonpayable"
     },
@@ -624,6 +1138,12 @@
           "type": "address",
           "indexed": true,
           "internalType": "address"
+        },
+        {
+          "name": "reasonCode",
+          "type": "uint8",
+          "indexed": false,
+          "internalType": "uint8"
         }
       ],
       "anonymous": false
@@ -785,6 +1305,37 @@
     },
     {
       "type": "event",
+      "name": "KeeperTipped",
+      "inputs": [
+        {
+          "name": "id",
+          "type": "uint256",
+          "indexed": true,
+          "internalType": "uint256"
+        },
+        {
+          "name": "round",
+          "type": "uint8",
+          "indexed": false,
+          "internalType": "uint8"
+        },
+        {
+          "name": "keeper",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "amount",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
       "name": "MemberJoined",
       "inputs": [
         {
@@ -823,6 +1374,114 @@
           "type": "address",
           "indexed": true,
           "internalType": "address"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "PqDisableCancelled",
+      "inputs": [
+        {
+          "name": "member",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "PqDisableRequested",
+      "inputs": [
+        {
+          "name": "member",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "unlockAt",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "PqGuardChanged",
+      "inputs": [
+        {
+          "name": "member",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "newVk",
+          "type": "bytes32",
+          "indexed": false,
+          "internalType": "bytes32"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "PqGuardDisabled",
+      "inputs": [
+        {
+          "name": "member",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "PqGuardEnabled",
+      "inputs": [
+        {
+          "name": "member",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "vk",
+          "type": "bytes32",
+          "indexed": false,
+          "internalType": "bytes32"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
+      "name": "RoundExtended",
+      "inputs": [
+        {
+          "name": "id",
+          "type": "uint256",
+          "indexed": true,
+          "internalType": "uint256"
+        },
+        {
+          "name": "round",
+          "type": "uint8",
+          "indexed": false,
+          "internalType": "uint8"
+        },
+        {
+          "name": "newRoundEnd",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
         }
       ],
       "anonymous": false
@@ -906,11 +1565,6 @@
     },
     {
       "type": "error",
-      "name": "AutoPayNotEnabled",
-      "inputs": []
-    },
-    {
-      "type": "error",
       "name": "BidAboveCap",
       "inputs": []
     },
@@ -961,6 +1615,11 @@
     },
     {
       "type": "error",
+      "name": "InsufficientGasForAutoPay",
+      "inputs": []
+    },
+    {
+      "type": "error",
       "name": "InvalidParams",
       "inputs": []
     },
@@ -977,6 +1636,46 @@
     {
       "type": "error",
       "name": "OnlyOneMemberEligible",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "PqDailyLimitExceeded",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "PqGuardAlreadyEnabled",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "PqGuardNotEnabled",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "PqInvalidKeyLength",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "PqInvalidSignature",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "PqTimelockAlreadyStarted",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "PqTimelockNotExpired",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "PqTimelockNotStarted",
       "inputs": []
     },
     {
