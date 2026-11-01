@@ -133,16 +133,23 @@ function DiscountChart({ history }: { history: RoundRecord[] }) {
 
 // ─── AutoPay section ──────────────────────────────────────────────────────────
 function AutoPaySection({
-  circleId, isMember, me, maxMembers, currentRound, contribution, isPending, tx,
+  circleId, isMember, me, maxMembers, currentRound, status, contribution, isPending, tx,
   onStore,
 }: {
   circleId: bigint; isMember: boolean; me: MemberInfo | undefined
-  maxMembers: number; currentRound: number; contribution: bigint
+  maxMembers: number; currentRound: number; status: number; contribution: bigint
   isPending: boolean; tx: (fn: string, args: unknown[], label: string) => void
   onStore: () => void
 }) {
   const hasAuth = me?.hasStoredAuth ?? false
-  const roundsLeft = maxMembers - currentRound + 1
+  // Mirror the same start-round logic used in handleStoreAutoPay
+  const alreadyPaid = me?.paidThisRound ?? false
+  const firstRound = status === 0
+    ? 1
+    : alreadyPaid ? currentRound + 1 : currentRound
+  const roundsLeft = Math.max(0, maxMembers - firstRound + 1)
+
+  if (roundsLeft === 0 && !hasAuth) return null   // nothing left to pre-sign
 
   return (
     <div className="flex flex-col gap-2">
@@ -240,6 +247,7 @@ function CirclePageInner() {
 
   const maxMembers     = Number(params?.maxMembers ?? 0)
   const contribution   = params?.contribution ?? 0n
+  const roundDuration  = Number(params?.roundDuration ?? 0)   // seconds
   const maxDiscountBps = Number(params?.maxDiscountBps ?? 0)
   const depositMul     = Number(params?.depositMultiplier ?? 1)
   const postWinLockBps = Number(params?.postWinLockBps ?? 0)
@@ -564,9 +572,27 @@ function CirclePageInner() {
   // ── Store AutoPay authorizations ──────────────────────────────────────────
   // ABI: storeAuthorizations(circleId, rounds, validBefores, vs, rs, ss) — no nonces array
   // value = contribution per round; nonce per round from contract.roundNonce
+  //
+  // Start round rules:
+  //   status === 0 (Open)  → round 1 (circle hasn't started yet)
+  //   status === 1 (Active), member already paid this round → currentRound + 1
+  //   status === 1 (Active), member hasn't paid → currentRound
+  //
+  // validBefore per round: now + (rounds_remaining + 2) × roundDuration + 7 days
+  //   so the last signature is valid for at least 7 days after it would be used.
   const handleStoreAutoPay = async () => {
     if (!address) { toast.error('Connect your wallet'); return }
     if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
+
+    // Determine first round to pre-sign
+    const firstRound = status === 0
+      ? 1
+      : alreadyPaid ? currentRound + 1 : currentRound
+
+    if (firstRound > maxMembers) {
+      toast.info('Nothing left to pre-sign — all rounds are complete or paid.')
+      return
+    }
 
     // 1. Balance check: storeAuthorizations has no USDC transfer, just needs gas
     const afford = canAfford(0n)
@@ -574,15 +600,21 @@ function CirclePageInner() {
 
     setIsSigning(true)
     try {
-      const roundsLeft = maxMembers - currentRound + 1
+      const totalToSign = maxMembers - firstRound + 1
       const rounds: number[] = []
       const validBefores: bigint[] = []
       const vs: number[] = []
       const rs: Hex[] = []
       const ss: Hex[] = []
-      for (let r = currentRound; r <= maxMembers; r++) {
-        toast.info(`Sign payment ${r - currentRound + 1} of ${roundsLeft}…`)
-        const sig = await signRoundAuth(circleId, r, contribution)
+
+      for (let r = firstRound; r <= maxMembers; r++) {
+        const sigNum = r - firstRound + 1
+        toast.info(`Sign payment ${sigNum} of ${totalToSign}…`)
+        // validBefore: must cover (rounds_remaining × roundDuration) + 7 days buffer
+        const roundsRemaining = maxMembers - r  // rounds after this one
+        const coveredSecs = (roundsRemaining + 2) * roundDuration + 60 * 60 * 24 * 7
+        const validBefore = BigInt(Math.floor(Date.now() / 1000) + Math.max(coveredSecs, 60 * 60 * 24 * 7))
+        const sig = await signRoundAuth(circleId, r, contribution, validBefore)
         rounds.push(r)
         validBefores.push(sig.validBefore)
         vs.push(sig.v)
@@ -932,11 +964,11 @@ function CirclePageInner() {
               </div>
             )}
 
-            {/* AutoPay section */}
-            {isMember && status === 1 && (
+            {/* AutoPay section — show in Open (pre-sign all rounds) and Active states */}
+            {isMember && (status === 0 || status === 1) && (
               <AutoPaySection
                 circleId={circleId} isMember={isMember} me={me}
-                maxMembers={maxMembers} currentRound={currentRound} contribution={contribution}
+                maxMembers={maxMembers} currentRound={currentRound} status={status} contribution={contribution}
                 isPending={isPending || isSigning} tx={tx}
                 onStore={() => { void handleStoreAutoPay() }}
               />

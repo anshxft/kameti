@@ -153,20 +153,25 @@ export function useEip3009Sign() {
   }, [walletClient, publicClient, verifyDomain, signEip712])
 
   /**
-   * Sign for payWithAuthorization.
+   * Sign for payWithAuthorization (single round) or storeAuthorizations (per-round).
    * value = contribution
    * nonce = contract.roundNonce(circleId, round, member)
+   *
+   * validBeforeOverride: caller supplies the expiry when signing AutoPay batches so
+   * that later-round signatures don't expire before they are used.  When omitted
+   * (plain pay), defaults to now + 1 hour — short enough to limit replay window.
    */
   const signRoundAuth = useCallback(async (
     circleId: bigint,
     round: number,
     value: bigint,
+    validBeforeOverride?: bigint,
   ): Promise<Eip3009Signature> => {
     if (!walletClient) throw new Error('No wallet connected')
     if (!publicClient) throw new Error('No public client')
     const from = walletClient.account.address
     await verifyDomain()
-    const validBefore = BigInt(Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7) // 7 days
+    const validBefore = validBeforeOverride ?? BigInt(Math.floor(Date.now() / 1000) + 3600) // 1 h
     const nonce = await publicClient.readContract({
       address: KAMETI_ADDRESS,
       abi: NONCE_ABI,
