@@ -1,6 +1,6 @@
 # Kameti
 
-**A kameti nobody can run away with.** Save together in USDC, bid for the pot when you need it, earn dividends while you wait. Enforced by a contract on Arc, not by an organiser. Built end to end in [Arc Studio](https://studio.arc.io).
+**A kameti nobody can run away with.** Save together in USDC, bid for the pot when you need it, earn dividends while you wait. Enforced by a contract on Arc, not by an organiser. Built in [Arc Studio](https://studio.arc.io) with a coding agent.
 
 | | |
 |---|---|
@@ -99,12 +99,13 @@ The contract has **not** had an independent audit. Use small amounts.
 
 - Deploy: [`0x5e76…06da`](https://explorer.arc.io/tx/0x5e761b1aee5bdd7e040941ca50e88a2a1eb621eb615596aebb3acb2748cc06da)
 - One settlement that ran 3/3 stored AutoPay payments, paid the keeper tip and the winner: [`0x561d…5abf`](https://explorer.arc.io/tx/0x561d59728e774c9d31474db40a4f4bca74ab1b0b6113a770fadc4d0078125abf)
+- A settlement where two members came up short: stored AutoPay ran for one, deposits covered the other two, and the winner was paid: [`0x5b2f…e931`](https://explorer.arc.io/tx/0x5b2f80042bf2a653f8907b284d5411f7d38d0aece39c3a3a3e622e827c17e931)
 
 The circles so far are small test circles run by the builder from their own wallets.
 
 ## How it was built in Arc Studio
 
-The contract, tests, audits and app were written in Arc Studio, driven through its CLI from a coding agent. Bugs found in review or in the browser went back to Studio as prompts. The last small UI and performance fixes were made by hand after Studio's daily limit ran out, and are visible in the git history:
+The contract, tests, audits and app were written in Arc Studio, driven through its CLI from a coding agent. Bugs found in review or in the browser went back to Studio as prompts. After Studio's daily limit ran out, the last UI, performance and crash fixes, the FAQ and the round calculator were written outside Studio by the same coding agent, and are in the git history:
 
 1. v1: circle, tests and the Cybercore design system; Studio's auditors found fund-lock and griefing risks, fixed with pull payments.
 2. v2: a real chit fund (bidding, deposits, debt, Kameti Score), max preset with fuzz and invariant tests; review caught a missing deadline check in `pay`.
