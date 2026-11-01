@@ -9,8 +9,7 @@ import { useReadContract } from 'wagmi'
 import { KAMETI_ADDRESS, KAMETI_ABI, CHAIN_ID, formatUsdc, explorerAddr } from '@/lib/contract'
 import { useArcStrip, useKametiEvents, useInrRate } from '@/hooks/useLiveData'
 import type { KametiEvent } from '@/hooks/useLiveData'
-import { DEMO_CIRCLE_ID } from '@/config/demo'
-import { DISPLAY_NAME } from '@/config/network'
+import { DISPLAY_NAME, NET } from '@/config/network'
 
 // ─── Headline ────────────────────────────────────────────────────────────────
 function ShuffleHeadline({ text }: { text: string }) {
@@ -130,8 +129,8 @@ const CHEATS = [
   {
     icon: Zap,
     cheat: 'An early winner stops paying',
-    rule:  'Post-win lock: 50% of deposit stays locked',
-    detail: 'After winning, half your deposit remains locked. Miss a future round and it is slashed. You keep paying.',
+    rule:  'Post-win lock: part of the payout stays locked',
+    detail: 'Part of the winner's payout stays locked and is released as they keep paying. Miss a round and the lock covers it first, then the deposit.',
   },
   {
     icon: AlertTriangle,
@@ -230,8 +229,8 @@ export default function Home() {
                 Try to break it
                 <ArrowRight size={14} />
               </Link>
-              {DEMO_CIRCLE_ID > 0n && (
-                <Link to={`/k/${DEMO_CIRCLE_ID}`}
+              {NET.demoCircleId > 0n && (
+                <Link to={`/k/${NET.demoCircleId}`}
                   className="press cell px-8 py-4 border border-ink text-ink label hover:bg-paper-2 flex items-center gap-2">
                   View demo circle
                   <ArrowRight size={14} />

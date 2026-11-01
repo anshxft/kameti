@@ -35,6 +35,7 @@ export default function App() {
           <Route path="/break"     element={<Break />} />
           <Route path="/reviewers" element={<Reviewers />} />
           <Route path="/bridge"    element={<Bridge />} />
+          <Route path="*" element={<div className="pt-32 px-6 md:px-14 pb-24"><p className="label text-muted mb-4">404</p><h1 className="font-display text-4xl md:text-6xl font-bold mb-8">This page does not exist.</h1><a href="/" className="link-line label text-ink font-bold">Back to home</a></div>} />
         </Routes></Suspense>
       </main>
     </BrowserRouter>

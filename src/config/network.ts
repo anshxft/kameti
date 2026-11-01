@@ -87,6 +87,7 @@ const MAINNET_CONFIG: NetworkConfig = {
   bridgeDestId:  'Arc',                   // Blockchain.Arc — confirmed in App Kit types
   mainnetReceipts: [
     { label: 'Kameti v3.1 deploy', hash: '0x5e761b1aee5bdd7e040941ca50e88a2a1eb621eb615596aebb3acb2748cc06da' },
+    { label: 'settleRound: AutoPay 3/3 with stored EIP-3009 signatures, keeper tip, winner payout + lock', hash: '0x561d59728e774c9d31474db40a4f4bca74ab1b0b6113a770fadc4d0078125abf' },
   ],
 }
 

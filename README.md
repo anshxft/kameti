@@ -8,7 +8,7 @@
 | Review it in 60 seconds | https://kameti-khaki.vercel.app/reviewers |
 | Try to break it | https://kameti-khaki.vercel.app/break |
 | Arc Studio project | https://studio.arc.io/app/81700373-0f8c-4789-9edf-fbad498edef8 |
-| Contract (Arc mainnet) | `<MAINNET_ADDRESS>` |
+| Contract (Arc mainnet) | [`0x049dE3a47D4baf6E9b4a40A589790b1C328e24b7`](https://explorer.arc.io/address/0x049dE3a47D4baf6E9b4a40A589790b1C328e24b7) |
 | Contract (Arc testnet) | [`0x34f31472c5d16e0562668fbea1e700b19b2ea5a7`](https://explorer.testnet.arc.io/address/0x34f31472c5d16e0562668fbea1e700b19b2ea5a7) |
 
 ## The problem
@@ -30,7 +30,7 @@ WhatsApp groups and register-books don't fix this, because whoever holds the mon
 | Early winner stops paying | **Post-win lock**: part of the winner's payout stays locked and is released as they keep paying. A missed payment is covered from the lock first, then the deposit. |
 | Member skips a round | **Security deposit** (1–3× the contribution) covers it at settlement; the member gets a strike. Once the deposit runs out, the shortfall becomes debt taken from their later payout. |
 | Member forgets to pay | **Pre-signed AutoPay**: members sign one EIP-3009 `ReceiveWithAuthorization` per round when they join; the signatures are stored on-chain and executed by anyone, including during settlement. No server, no allowance. |
-| Disputes over the hisaab | Every payment, bid, settlement, slash, lock release and withdrawal is an event on Arc, readable on `/verify` without a wallet. |
+| Disputes over the hisaab | Every payment, bid, settlement, slash, lock release and withdrawal is an event on Arc, public on the explorer. |
 | Stolen wallet key | Optional **post-quantum guard**: above a daily limit, withdrawals also need an SLH-DSA-SHA2-128s signature checked by Arc's precompile `0x1800…0004`, and the signature fixes the destination. |
 | Last-second bid sniping | **Soft close**: a bid in the last window extends the round, up to a cap. |
 
@@ -65,9 +65,9 @@ score = 600 + 5·onTimePayments + 40·circlesCompleted − 30·strikes − 120·
 
 Circles can require a minimum score to join. Other Arc apps can read it through `IKametiScore` (`scoreOf`, `statsOf`, `isReliable`).
 
-## Keeper Agent
+## Keeper tip
 
-A small agent runs every 5 minutes, executes stored AutoPay authorizations, settles rounds whose deadline has passed and collects the keeper tip, so it pays for its own gas. Anyone can run one; the contract does not depend on it. Its balance and actions are public on `/agent`.
+Anyone can settle a round after its deadline and earn a small tip from the pot (up to 0.2%, capped at 0.05 USDC), so a circle never depends on one person or server. A bot can do this; none is bundled yet.
 
 ## Contract
 
@@ -95,15 +95,22 @@ A small agent runs every 5 minutes, executes stored AutoPay authorizations, sett
 
 The contract has **not** had an independent audit. Use small amounts.
 
+## On Arc mainnet
+
+- Deploy: [`0x5e76…06da`](https://explorer.arc.io/tx/0x5e761b1aee5bdd7e040941ca50e88a2a1eb621eb615596aebb3acb2748cc06da)
+- One settlement that ran 3/3 stored AutoPay payments, paid the keeper tip and the winner: [`0x561d…5abf`](https://explorer.arc.io/tx/0x561d59728e774c9d31474db40a4f4bca74ab1b0b6113a770fadc4d0078125abf)
+
+The circles so far are small test circles run by the builder from their own wallets.
+
 ## How it was built in Arc Studio
 
-Every contract line, test and screen came out of Arc Studio, driven through its CLI from a coding agent. Each bug found in review or in the browser went back to Studio as a prompt and was fixed there:
+The contract, tests, audits and app were written in Arc Studio, driven through its CLI from a coding agent. Bugs found in review or in the browser went back to Studio as prompts. The last small UI and performance fixes were made by hand after Studio's daily limit ran out, and are visible in the git history:
 
 1. v1: circle, tests and the Cybercore design system; Studio's auditors found fund-lock and griefing risks, fixed with pull payments.
 2. v2: a real chit fund (bidding, deposits, debt, Kameti Score), max preset with fuzz and invariant tests; review caught a missing deadline check in `pay`.
 3. v3: pre-signed AutoPay on Arc's EIP-3009 USDC, one-signature join and pay, soft-close auctions.
 4. v3.1: post-win lock, keeper tip, post-quantum withdrawal guard, `IKametiScore`; review caught a 63/64 gas-griefing path that could slash honest members, fixed with a gas reserve and starvation check.
-5. Mainnet deploy from a Circle developer wallet through Studio.
+5. Mainnet deploy of the Studio-written contract from the builder's own wallet with `forge create`.
 
 ## Run locally
 
@@ -123,7 +130,7 @@ forge test           # contracts
 
 ## Roadmap
 
-Sealed-bid rounds · yield on locked deposits · insurance pool from a slice of dividends · reminders over Telegram/WhatsApp · organiser commission option for community-run circles · Kameti Score as an attestation for lending and rentals.
+A bundled keeper bot · sealed-bid rounds · yield on locked deposits · insurance pool from a slice of dividends · reminders over Telegram/WhatsApp · organiser commission option for community-run circles · Kameti Score as an attestation for lending and rentals.
 
 ## License
 

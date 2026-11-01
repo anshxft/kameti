@@ -921,7 +921,7 @@ function CirclePageInner() {
             )}
 
             {/* Pay this round */}
-            {address && status === 1 && isMember && !alreadyPaid && !me?.defaulted && (
+            {address && status === 1 && payPhase && isMember && !alreadyPaid && !me?.defaulted && (
               <button
                 onClick={() => { void handlePay() }}
                 disabled={isPending || isSigning}
@@ -937,8 +937,11 @@ function CirclePageInner() {
               </p>
             )}
 
-            {/* Settle — anyone can call, shows keeper tip */}
-            {address && status === 1 && (
+            {settlePhase && address && (
+              <p className="label text-muted px-2 py-1">Deadline passed. Settling also runs every stored AutoPay payment.</p>
+            )}
+            {/* Settle: anyone can call after the deadline, or early in the last round */}
+            {address && status === 1 && (settlePhase || currentRound === maxMembers) && (
               <button onClick={() => tx('settleRound', [circleId], 'Round settled')}
                 disabled={isPending}
                 className="press cell py-3 px-6 border border-ink label flex items-center gap-2 disabled:opacity-40">
@@ -948,7 +951,7 @@ function CirclePageInner() {
             )}
 
             {/* Run AutoPay for everyone */}
-            {address && status === 1 && (
+            {address && status === 1 && payPhase && (
               <button onClick={() => tx('executeAutoPay', [circleId], 'AutoPay executed')}
                 disabled={isPending}
                 className="press cell py-3 px-6 border border-line label text-muted flex items-center gap-2 disabled:opacity-40">

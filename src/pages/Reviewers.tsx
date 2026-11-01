@@ -6,18 +6,17 @@ import { Link } from 'react-router-dom'
 import { ExternalLink, ArrowRight, Check } from 'lucide-react'
 import { useBoot } from '@/motion'
 import { KAMETI_ADDRESS, CHAIN_ID, explorerAddr, explorerTx } from '@/lib/contract'
-import { DEMO_CIRCLE_ID } from '@/config/demo'
-import { DISPLAY_NAME } from '@/config/network'
+import { DISPLAY_NAME, NET } from '@/config/network'
 
 // ── Config (one-line switches when live) ────────────────────────────────────
 const GITHUB_URL       = 'https://github.com/anshxft/kameti'
 const ARC_STUDIO_URL   = 'https://studio.arc.io/app/81700373-0f8c-4789-9edf-fbad498edef8'
 const EXPLORER_URL     = explorerAddr(KAMETI_ADDRESS)
 const DEMO_VIDEO_URL   = '' // fill in when recorded
-// DEMO_CIRCLE_ID imported from @/config/demo (committed default: 2)
+const DEMO_CIRCLE_ID = NET.demoCircleId
 
 // ── Testnet proof transactions (seeded demo circle #2) ──────────────────────
-// These are real Arc Testnet transactions pushing real USDC through EIP-3009.
+// Arc Testnet transactions using Arc's testnet USDC through EIP-3009.
 const TESTNET_PROOF_TXS: { label: string; hash: string }[] = [
   { label: 'createCircleWithAuthorization (demo circle #2)', hash: '0x0b15024048bec12363e0c7092795ff32ae2a5674fb65163cfeedbc45e02ac219' },
   { label: 'executeAutoPay — 4/4 members, all EIP-3009', hash: '0xd396594d875fa07f0b77ae6aea5d8c98a4e71e6db59bb5f6b6f8847122a75221' },
@@ -26,8 +25,7 @@ const TESTNET_PROOF_TXS: { label: string; hash: string }[] = [
   { label: 'payWithAuthorization — round 2, single payment', hash: '0xf8afbef2647a0386e4fd663244b11e41c7698def28f662695c3ca13dd359ed29' },
 ]
 
-// Mainnet receipts — empty until the mainnet circle runs
-const MAINNET_RECEIPTS: { label: string; hash: string }[] = []
+const MAINNET_RECEIPTS = NET.mainnetReceipts
 
 const ABI_STATS = {
   totalEntries:  90,
@@ -94,7 +92,7 @@ export default function Reviewers() {
           <p className="label text-muted mb-2">Review guide</p>
           <h1 className="font-display text-5xl md:text-7xl font-bold mb-4">Review Kameti in 60 seconds.</h1>
           <p className="font-sans text-muted text-lg max-w-2xl">
-            Everything a reviewer needs: live links, test results, testnet receipts, and what still needs work.
+            Everything a reviewer needs: live links, test results, mainnet receipts, testnet proof, and what still needs work.
           </p>
         </div>
 
@@ -154,7 +152,7 @@ export default function Reviewers() {
             {DEMO_CIRCLE_ID > 0n && (
               <CheckItem n={7} label="Demo circle on testnet"
                 link={<Link to={`/k/${DEMO_CIRCLE_ID}`} className="link-line label text-ink font-bold flex items-center gap-1.5">View demo circle #{DEMO_CIRCLE_ID.toString()} <ArrowRight size={10} /></Link>}
-                note="Real USDC flowing through EIP-3009, AutoPay, keeper tip, and PQ guard." />
+                note="Testnet USDC through EIP-3009, AutoPay, keeper tip, and PQ guard." />
             )}
 
             <CheckItem n={8} label="Mainnet receipts"
@@ -167,7 +165,7 @@ export default function Reviewers() {
                     </a>
                   ))}
                 </div>
-              ) : <p className="label text-muted text-[10px]">Mainnet receipts appear here after the mainnet circle runs.</p>}
+              ) : <p className="label text-muted text-[10px]">None yet.</p>}
             />
 
             <CheckItem n={DEMO_CIRCLE_ID ? 9 : 8} label="Demo video"
@@ -181,10 +179,10 @@ export default function Reviewers() {
         {/* Testnet proof */}
         {TESTNET_PROOF_TXS.length > 0 && (
           <div className="cell px-6 md:px-14 py-8 bg-paper-2 border-t border-line" data-boot>
-            <p className="label text-muted mb-4">Testnet proof: real Arc USDC through EIP-3009</p>
+            <p className="label text-muted mb-4">Testnet proof: Arc testnet USDC through EIP-3009</p>
             <p className="label text-muted text-[10px] mb-4">
               Demo circle #2 — 4 members, 0.5 USDC contribution, 30-min rounds, keeper tip 10 bps, post-win lock 50%.
-              All payments went through <code className="font-mono">receiveWithAuthorization</code> on native Arc USDC. No approve. No gas from members.
+              All payments went through <code className="font-mono">receiveWithAuthorization</code> on native Arc USDC. No approve transaction. Members pay gas once to store their signatures; whoever runs AutoPay pays gas for each round.
             </p>
             <div className="flex flex-col gap-2">
               {TESTNET_PROOF_TXS.map((tx, i) => (

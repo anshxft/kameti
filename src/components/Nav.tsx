@@ -218,7 +218,7 @@ export default function Nav() {
           </Link>
 
           {/* Desktop links (hidden on mobile) */}
-          <div className="hidden sm:flex flex-1 items-stretch min-w-0 overflow-x-hidden">
+          <div className="hidden lg:flex flex-1 items-stretch min-w-0 overflow-x-hidden">
             <Link to="/"        className={`cell px-3 md:px-4 flex items-center label press hover:bg-paper-2 ${active('/')} whitespace-nowrap`}>Home</Link>
             <Link to="/new"     className={`cell px-3 md:px-4 flex items-center label press hover:bg-paper-2 ${active('/new')} whitespace-nowrap`}>New</Link>
             <Link to="/me"      className={`cell px-3 md:px-4 flex items-center label press hover:bg-paper-2 ${active('/me')} whitespace-nowrap`}>My Circles</Link>
@@ -232,7 +232,7 @@ export default function Nav() {
           </div>
 
           {/* Spacer on mobile so controls hug the right */}
-          <div className="flex-1 sm:hidden" />
+          <div className="flex-1 lg:hidden" />
 
           {/* Right controls — always visible, never overlap */}
           <ThemeToggle />
@@ -256,7 +256,7 @@ export default function Nav() {
           {/* Hamburger — mobile only */}
           <button
             onClick={() => setSheetOpen(true)}
-            className="sm:hidden press cell w-11 h-11 flex items-center justify-center text-ink hover:bg-paper-2 shrink-0"
+            className="lg:hidden press cell w-11 h-11 flex items-center justify-center text-ink hover:bg-paper-2 shrink-0"
             aria-label="Open navigation"
             aria-expanded={sheetOpen}
           >
