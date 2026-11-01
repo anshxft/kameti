@@ -105,7 +105,7 @@ export function useScrollMotion(
     ScrollTrigger.getAll().forEach((t) => t.kill())
 
     // Set initial hidden state
-    gsap.set(reveal, { opacity: 0, y: 14 })
+    gsap.set(reveal, { y: 14 }) // never hide content: a late trigger must not leave a blank page
 
     // Batch reveal: elements crossing 90% viewport height animate in
     ScrollTrigger.batch(reveal, {
