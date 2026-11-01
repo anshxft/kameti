@@ -26,7 +26,7 @@ function ensureLenis() {
   if (reducedMotion()) return null
 
   lenis = new Lenis({
-    duration: 1.2,
+    duration: 0.7,
     easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
   })
 
@@ -105,19 +105,19 @@ export function useScrollMotion(
     ScrollTrigger.getAll().forEach((t) => t.kill())
 
     // Set initial hidden state
-    gsap.set(reveal, { opacity: 0, y: 32 })
+    gsap.set(reveal, { opacity: 0, y: 14 })
 
     // Batch reveal: elements crossing 90% viewport height animate in
     ScrollTrigger.batch(reveal, {
-      start: 'top 92%',
+      start: 'top bottom+=320',
       once: true,
       onEnter: (batch) =>
         gsap.to(batch, {
           opacity: 1,
           y: 0,
-          duration: 0.85,
+          duration: 0.4,
           ease: 'expo.out',
-          stagger: 0.06,
+          stagger: 0.02,
           overwrite: true,
         }),
     })

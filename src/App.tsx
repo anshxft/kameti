@@ -1,14 +1,15 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import Nav from './components/Nav'
 import Home from './pages/Home'
-import NewCircle from './pages/NewCircle'
-import CirclePage from './pages/CirclePage'
-import MyCircles from './pages/MyCircles'
-import ScorePage from './pages/Score'
-import Break from './pages/Break'
-import Reviewers from './pages/Reviewers'
-import Bridge from './pages/Bridge'
+const NewCircle = lazy(() => import('./pages/NewCircle'))
+const CirclePage = lazy(() => import('./pages/CirclePage'))
+const MyCircles = lazy(() => import('./pages/MyCircles'))
+const ScorePage = lazy(() => import('./pages/Score'))
+const Break = lazy(() => import('./pages/Break'))
+const Reviewers = lazy(() => import('./pages/Reviewers'))
+const Bridge = lazy(() => import('./pages/Bridge'))
 import { refreshScroll } from './motion'
 
 // Kill stale ScrollTrigger instances on every route change
@@ -24,7 +25,7 @@ export default function App() {
       <ScrollReset />
       <Nav />
       <main>
-        <Routes>
+        <Suspense fallback={null}><Routes>
           <Route path="/"          element={<Home />} />
           <Route path="/new"       element={<NewCircle />} />
           <Route path="/k/:id"     element={<CirclePage />} />
@@ -34,7 +35,7 @@ export default function App() {
           <Route path="/break"     element={<Break />} />
           <Route path="/reviewers" element={<Reviewers />} />
           <Route path="/bridge"    element={<Bridge />} />
-        </Routes>
+        </Routes></Suspense>
       </main>
     </BrowserRouter>
   )
