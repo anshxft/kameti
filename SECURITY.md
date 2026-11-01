@@ -37,6 +37,7 @@ Kameti holds other people's savings, so this file states plainly what the contra
 - **Post-quantum precompile is experimental** on Arc, and PQ signatures are used only as a second factor next to the wallet key, as Arc recommends.
 - **Score is per wallet.** A defaulter can start over with a new wallet at the default score of 600; circles that need more trust should set a minimum score.
 - **USDC blocklist.** If Circle blocklists a member, their own transfers fail; pull payments keep everyone else unaffected.
+- **Rejoining a circle after leaving** uses a standard approve + join, because each deposit signature works once.
 
 ## Reporting
 

@@ -27,6 +27,20 @@ import type { KametiCircle, MemberInfo, RoundRecord } from '@/lib/types'
 const STATUS_LABELS = ['OPEN', 'ACTIVE', 'COMPLETED'] as const
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 
+// Minimal USDC ABI fragments used in the rejoin path
+const USDC_REJOIN_ABI = [
+  {
+    name: 'authorizationState', type: 'function', stateMutability: 'view',
+    inputs: [{ name: 'authorizer', type: 'address' }, { name: 'nonce', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    name: 'approve', type: 'function', stateMutability: 'nonpayable',
+    inputs: [{ name: 'spender', type: 'address' }, { name: 'value', type: 'uint256' }],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+] as const
+
 function ScoreBadge({ score }: { score: number }) {
   const tier = score >= 750 ? 'EXCELLENT' : score >= 650 ? 'GOOD' : score >= 550 ? 'FAIR' : 'POOR'
   const bg   = score >= 650 ? 'bg-ink text-paper' : score >= 550 ? 'border border-line text-muted' : 'border border-signal-ink/50 text-signal-ink'
@@ -329,7 +343,7 @@ function CirclePageInner() {
   }, [fetchClaimable])
 
   // ── Transactions ──────────────────────────────────────────────────────────
-  const { writeContract, data: hash, isPending } = useWriteContract()
+  const { writeContract, writeContractAsync, data: hash, isPending } = useWriteContract()
   const { isSuccess: txSuccess, isError: txError, data: txReceipt } = useWaitForTransactionReceipt({ hash })
 
   useEffect(() => {
@@ -393,15 +407,87 @@ function CirclePageInner() {
   // ABI: joinWithAuthorization(circleId, validBefore, nonce, v, r, s) — 6 args
   // value = deposit = contribution × depositMultiplier
   // nonce = contract.depositNonce(circleId, member)
+  //
+  // Rejoin path: if the nonce is already used (member left before), the EIP-3009
+  // signature would be rejected by USDC. Detect this via authorizationState and
+  // fall back to approve(KAMETI, deposit) + join(circleId) instead.
   const handleJoin = async () => {
     if (!address) { toast.error('Connect your wallet'); return }
     if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
+    if (!publicClient) { toast.error('Client not ready'); return }
     const depositRaw = contribution * BigInt(depositMul)
 
     // 1. Balance check
     const afford = canAfford(depositRaw)
     if (!afford.ok) { insufficientToast(afford.have, afford.need); return }
 
+    // 2. Fetch the deposit nonce for this member
+    let nonce: Hex
+    try {
+      nonce = await publicClient.readContract({
+        address: KAMETI_ADDRESS, abi: KAMETI_ABI as never,
+        functionName: 'depositNonce', args: [circleId, address],
+      })
+    } catch (e) { toast.error(`Could not read deposit nonce: ${friendlyError(e)}`); return }
+
+    // 3. Check whether that nonce has already been used (USDC authorizationState)
+    let nonceUsed = false
+    try {
+      nonceUsed = await publicClient.readContract({
+        address: NET.usdcAddress, abi: USDC_REJOIN_ABI,
+        functionName: 'authorizationState',
+        args: [address, nonce],
+      })
+    } catch { /* if call fails, assume fresh — proceed with EIP-3009 */ }
+
+    if (nonceUsed) {
+      // ── Rejoin path: approve + join ──────────────────────────────────────
+      toast.info(
+        'You left this circle earlier, so rejoining needs one approval.',
+        { duration: 5000 }
+      )
+      setIsSigning(true)
+      try {
+        // Step A: approve the deposit amount
+        const approveTx = await writeContractAsync({
+          address: NET.usdcAddress, abi: USDC_REJOIN_ABI,
+          functionName: 'approve',
+          args: [KAMETI_ADDRESS, depositRaw],
+          chainId: CHAIN_ID,
+        })
+        toast.info('Approval sent — waiting for confirmation…')
+        await publicClient.waitForTransactionReceipt({ hash: approveTx })
+
+        // Step B: simulate join() before sending
+        try {
+          await publicClient.simulateContract({
+            address: KAMETI_ADDRESS, abi: KAMETI_ABI,
+            functionName: 'join', args: [circleId], account: address,
+          })
+        } catch (simErr) {
+          toast.error(`Join would fail: ${friendlyError(simErr)}`, { duration: 7000 }); return
+        }
+
+        // Step C: join
+        toast.info('Submitting join transaction…')
+        writeContract(
+          { address: KAMETI_ADDRESS, abi: KAMETI_ABI, functionName: 'join', args: [circleId], chainId: CHAIN_ID },
+          {
+            onSuccess: (h) => toast.success('Rejoined!', {
+              description: <a href={explorerTx(h)} target="_blank" rel="noopener" className="underline label">View tx →</a>,
+            }),
+            onError: (e) => toast.error(friendlyError(e)),
+          }
+        )
+      } catch (e) {
+        toast.error(friendlyError(e))
+      } finally {
+        setIsSigning(false)
+      }
+      return
+    }
+
+    // ── Fresh-join path: EIP-3009 ────────────────────────────────────────────
     setIsSigning(true)
     let sig: Awaited<ReturnType<typeof signDepositAuth>>
     try {
@@ -410,10 +496,10 @@ function CirclePageInner() {
     } catch (e) { toast.error(friendlyError(e)); setIsSigning(false); return }
     setIsSigning(false)
 
-    // 2. Simulate
+    // Simulate before sending
     const joinArgs = [circleId, sig.validBefore, sig.nonce, sig.v, sig.r, sig.s] as const
     try {
-      if (publicClient) await publicClient.simulateContract({
+      await publicClient.simulateContract({
         address: KAMETI_ADDRESS, abi: KAMETI_ABI,
         functionName: 'joinWithAuthorization', args: joinArgs, account: address,
       })
@@ -809,6 +895,17 @@ function CirclePageInner() {
           {/* My balance + AutoPay + withdraw */}
           <div className="flex flex-col gap-4">
             <p className="label text-muted mb-1">My Balance</p>
+
+            {/* Deposit refund notice — shown when user left the circle and their deposit is waiting */}
+            {address && !isMember && myClaimable > 0n && (
+              <div className="cell p-4 border border-signal-ink/30 bg-signal/5">
+                <p className="label text-signal-ink font-bold text-[11px] mb-1">DEPOSIT REFUND WAITING</p>
+                <p className="label text-muted text-[11px]">
+                  Your deposit was returned to your claimable balance when you left. Withdraw it below.
+                </p>
+              </div>
+            )}
+
             <div className="cell p-5">
               <p className="label text-muted mb-1">Claimable</p>
               <p className="font-display text-3xl font-bold">
