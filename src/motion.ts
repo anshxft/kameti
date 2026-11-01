@@ -184,6 +184,93 @@ export function useScrollMotion(
   }, [ready, scope])
 }
 
+// ─── Hero entrance ────────────────────────────────────────────────────────────
+const SCRAMBLE_GLYPHS = 'ABCDEFGHKMNRSTUVXYZ0123456789#$%'
+const randomGlyph = () => SCRAMBLE_GLYPHS[Math.floor(Math.random() * SCRAMBLE_GLYPHS.length)]
+const CHAR_STAGGER = 0.024
+const CHAR_FLIPS = 4
+const FLIP_EVERY = 0.055
+const FONT_WAIT_MS = 800
+
+/**
+ * GSAP: the headline assembles on load. Each [data-hero-char] rises out of its
+ * [data-hero-word] mask while cycling glyphs, [data-hero-band] wipes in behind
+ * it, then [data-hero-rise] blocks follow. Waits for fonts so widths are final.
+ */
+export function useHeroIntro(scope: RefObject<HTMLElement | null>) {
+  useGSAP((_context, contextSafe) => {
+    const root = scope.current
+    if (!root || reducedMotion()) return
+
+    const select = gsap.utils.selector(root)
+    const chars = select('[data-hero-char]') as HTMLElement[]
+    const words = select('[data-hero-word]')
+    const band = select('[data-hero-band]')
+    const rise = select('[data-hero-rise]')
+    const mark = select('.hero-pinwheel')
+    const eyebrow = select('[data-hero-eyebrow]')[0] as HTMLElement | undefined
+
+    const markOpacity = mark[0] ? getComputedStyle(mark[0]).opacity : '0' // differs per theme
+
+    // Hidden before first paint (useGSAP runs in a layout effect)
+    gsap.set(chars, { yPercent: 115 })
+    gsap.set(words, { clipPath: 'inset(0 -0.1em)' })
+    gsap.set(band, { scaleX: 0, transformOrigin: 'left center' })
+    gsap.set(rise, { opacity: 0, y: 16 })
+    gsap.set(mark, { opacity: 0, scale: 0.7, rotation: -90 })
+    if (eyebrow) gsap.set(eyebrow, { opacity: 0 })
+
+    let cancelled = false
+    const play = contextSafe!(() => {
+      if (cancelled) return
+      const tl = gsap.timeline({
+        onComplete: () => { gsap.set([...chars, ...words], { clearProps: 'all' }) },
+      })
+
+      tl.to(mark, { opacity: markOpacity, scale: 1, rotation: 0, duration: 1.6, ease: 'expo.out', clearProps: 'all' }, 0)
+      tl.to(band, { scaleX: 1, duration: 0.7, ease: 'expo.inOut' }, 0.12)
+
+      if (eyebrow) {
+        const text = eyebrow.textContent ?? ''
+        const progress = { value: 0 }
+        tl.set(eyebrow, { opacity: 1 }, 0)
+        tl.to(progress, {
+          value: text.length,
+          duration: 0.7,
+          ease: 'none',
+          onUpdate: () => {
+            const done = Math.floor(progress.value)
+            eyebrow.textContent = text.slice(0, done) +
+              Array.from(text.slice(done, done + 6), randomGlyph).join('')
+          },
+          onComplete: () => { eyebrow.textContent = text },
+        }, 0)
+      }
+
+      chars.forEach((el, i) => {
+        const real = el.textContent ?? ''
+        el.style.width = `${el.getBoundingClientRect().width}px` // glyphs must not reflow the line
+        el.style.textAlign = 'center'
+        const start = 0.15 + i * CHAR_STAGGER
+        for (let flip = 0; flip < CHAR_FLIPS; flip++) {
+          tl.call(() => { el.textContent = randomGlyph() }, undefined, start + flip * FLIP_EVERY)
+        }
+        tl.call(() => { el.textContent = real }, undefined, start + CHAR_FLIPS * FLIP_EVERY)
+        tl.to(el, { yPercent: 0, duration: 0.7, ease: 'expo.out' }, start)
+      })
+
+      tl.to(rise, { opacity: 1, y: 0, duration: 0.6, ease: 'expo.out', stagger: 0.09, clearProps: 'all' }, 0.7)
+    })
+
+    void Promise.race([
+      document.fonts.ready,
+      new Promise((resolve) => setTimeout(resolve, FONT_WAIT_MS)),
+    ]).then(play)
+
+    return () => { cancelled = true }
+  }, { scope })
+}
+
 // ─── Marquee ──────────────────────────────────────────────────────────────────
 const MARQUEE_SPEED = 45 // px/s
 

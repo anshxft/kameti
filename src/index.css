@@ -370,8 +370,50 @@ body {
 
 /* Calculator slider */
 .calc-range {
-  height: 24px;
-  accent-color: var(--signal-ink);
+  height: 28px;
+  background: transparent;
+  cursor: grab;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.calc-range:active {
+  cursor: grabbing;
+}
+.calc-range::-webkit-slider-runnable-track {
+  height: 4px;
+  background:
+    linear-gradient(var(--signal-ink), var(--signal-ink)) 0 0 / var(--fill) 100% no-repeat,
+    var(--line);
+}
+.calc-range::-moz-range-track {
+  height: 4px;
+  background:
+    linear-gradient(var(--signal-ink), var(--signal-ink)) 0 0 / var(--fill) 100% no-repeat,
+    var(--line);
+}
+.calc-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -8px;
+  border: 2px solid var(--paper);
+  border-radius: 9999px;
+  background: var(--signal-ink);
+  transition: transform 160ms var(--ease-out);
+}
+.calc-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--paper);
+  border-radius: 9999px;
+  background: var(--signal-ink);
+  transition: transform 160ms var(--ease-out);
+}
+.calc-range:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+.calc-range:active::-moz-range-thumb {
+  transform: scale(1.2);
 }
 
 @media (hover: hover) and (pointer: fine) {

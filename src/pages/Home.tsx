@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Lock, Zap, Eye, Check, X, AlertTriangle } from 'lucide-react'
 import NumberFlow from '@number-flow/react'
-import { useBoot, useScrollMotion, useMarquee } from '@/motion'
+import { useBoot, useHeroIntro, useScrollMotion, useMarquee } from '@/motion'
 import DotGrid from '@/components/DotGrid'
 import { KametiMark } from '@/components/Nav'
 import Faq from '@/components/Faq'
@@ -20,9 +20,9 @@ function ShuffleHeadline({ text }: { text: string }) {
   return (
     <span className="inline">
       {words.map((word, wi) => (
-        <span key={wi} className="inline-block">
+        <span key={wi} className="inline-block" data-hero-word>
           {word.split('').map((ch, ci) => (
-            <span key={ci} style={{ display: 'inline-block' }}>{ch}</span>
+            <span key={ci} className="inline-block" data-hero-char>{ch}</span>
           ))}
           {wi < words.length - 1 && (
             <span style={{ display: 'inline-block', width: '0.35em' }}>&nbsp;</span>
@@ -142,7 +142,7 @@ const CHEATS = [
     icon: AlertTriangle,
     cheat: 'Members forget or skip rounds',
     rule:  'Pre-signed EIP-3009 AutoPay + deposit',
-    detail: 'Sign once. Anyone can execute your payment each round from your pre-signed authorizations — no gas from you.',
+    detail: 'Sign your remaining rounds up front. Anyone can then execute each payment from those signatures — no gas from you.',
   },
   {
     icon: Eye,
@@ -166,7 +166,7 @@ const COMP_ROWS: CompRow[] = [
 // ─── Steps ────────────────────────────────────────────────────────────────────
 const STEPS = [
   { n: '01', title: 'Lock a Deposit', body: 'Each member locks 1–3× their contribution as a security deposit. Your deposit backs your commitment.' },
-  { n: '02', title: 'Pay Each Round', body: 'Pre-sign payments once. AutoPay handles it automatically — no gas each round, no forgotten deadlines.' },
+  { n: '02', title: 'Pay Each Round', body: 'Pre-sign your rounds up front. AutoPay handles them after that — no gas each round, no forgotten deadlines.' },
   { n: '03', title: 'Bid for the Pot', body: 'An ascending auction opens every round. Bid a discount on the pot — the highest bidder wins early access.' },
   { n: '04', title: 'Earn Dividends', body: 'Discounts and recovered deposits are split equally among all other members. Everyone earns while they wait.' },
 ]
@@ -185,6 +185,7 @@ export default function Home() {
   const pageRef = useRef<HTMLDivElement>(null)
   useBoot(pageRef)
   useScrollMotion(pageRef)
+  useHeroIntro(pageRef)
 
   const inrRate = useInrRate()
   const liveEvents = useKametiEvents(20)
@@ -208,24 +209,29 @@ export default function Home() {
           <DotGrid />
           <PinwheelMark className="hero-pinwheel hidden lg:block" />
           <div className="relative z-10 max-w-3xl">
-            <p className="label text-muted mb-4">Real Chit Fund · {DISPLAY_NAME} · USDC only</p>
-            <h1 className="font-display text-5xl md:text-7xl lg:text-8xl font-bold leading-none tracking-tight mb-6">
+            <p className="label text-muted mb-4" data-hero-eyebrow>Real Chit Fund · {DISPLAY_NAME} · USDC only</p>
+            <h1
+              aria-label="A kameti nobody can run away with."
+              className="font-display text-5xl md:text-7xl lg:text-8xl font-bold leading-[1.08] tracking-tight mb-6"
+            >
               <ShuffleHeadline text="A KAMETI" />
               <br />
-              {/* Mint is too light for text on paper; render as ink-on-mint block */}
-              <span className="inline bg-signal text-on-signal px-2 -mx-1">
+              {/* Mint is too light for text on paper; render as ink-on-mint block.
+                  inline-block keeps the band to one line, so it can't cover the lines around it. */}
+              <span className="relative isolate inline-block text-on-signal px-2 -mx-1">
+                <span data-hero-band className="absolute inset-0 -z-10 bg-signal" />
                 <ShuffleHeadline text="NOBODY CAN" />
               </span>
               <br />
               <ShuffleHeadline text="RUN AWAY WITH." />
             </h1>
-            <p className="font-sans text-lg text-muted max-w-2xl mb-3">
+            <p className="font-sans text-lg text-muted max-w-2xl mb-3" data-hero-rise>
               Save together in USDC. Bid for the pot when you need it. Earn dividends while you wait.
             </p>
-            <p className="font-sans text-base text-muted max-w-2xl mb-10">
+            <p className="font-sans text-base text-muted max-w-2xl mb-10" data-hero-rise>
               Enforced by Arc, not an organiser. No admin key. No spreadsheet. No trust.
             </p>
-            <div className="flex flex-wrap gap-0">
+            <div className="flex flex-wrap gap-0" data-hero-rise>
               <Link to="/new"
                 className="press cell px-8 py-4 bg-signal text-on-signal border border-ink label font-bold hover:bg-signal-hover flex items-center gap-2">
                 Start a Kameti
