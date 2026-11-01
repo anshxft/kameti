@@ -16,6 +16,51 @@ import { ConnectKitButton } from 'connectkit'
 import { Moon, Sun, Menu, X, ArrowRight, Zap } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 
+// ── Kameti mark ───────────────────────────────────────────────────────────────
+// Switches between light/dark SVG by watching data-theme on <html>.
+// On first mount (nav only) the image does one 90-degree quarter-turn,
+// 700ms ease-out, transform only. Disabled under prefers-reduced-motion.
+export function KametiMark({ size, animate = false }: { size: number; animate?: boolean }) {
+  const [isDark, setIsDark] = useState(
+    () => document.documentElement.dataset.theme === 'dark'
+  )
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  // Watch data-theme attribute changes
+  useEffect(() => {
+    const obs = new MutationObserver(() => {
+      setIsDark(document.documentElement.dataset.theme === 'dark')
+    })
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    return () => obs.disconnect()
+  }, [])
+
+  // Quarter-turn on mount (nav only)
+  useEffect(() => {
+    if (!animate) return
+    const el = imgRef.current
+    if (!el) return
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    if (mq.matches) return
+    el.style.transition = 'none'
+    el.style.transform = 'rotate(0deg)'
+    void el.offsetWidth           // force reflow to register start state
+    el.style.transition = 'transform 700ms ease-out'
+    el.style.transform = 'rotate(90deg)'
+  }, [animate])
+
+  return (
+    <img
+      ref={imgRef}
+      src={isDark ? '/kameti-mark-dark.svg' : '/kameti-mark-light.svg'}
+      alt="Kameti"
+      width={size}
+      height={size}
+      style={{ display: 'block', flexShrink: 0 }}
+    />
+  )
+}
+
 // ── Theme toggle ──────────────────────────────────────────────────────────────
 function ThemeToggle() {
   const [dark, setDark] = useState(() => {
@@ -163,9 +208,10 @@ export default function Nav() {
           {/* Wordmark — always visible, uses CSS-variable text-ink (switches with theme) */}
           <Link
             to="/"
-            className="cell px-5 flex items-center press hover:bg-paper-2 shrink-0"
+            className="cell px-5 flex items-center gap-2 press hover:bg-paper-2 shrink-0"
             aria-label="Kameti home"
           >
+            <KametiMark size={22} animate />
             <span className="font-display text-sm font-bold tracking-widest uppercase text-ink">
               Kameti
             </span>

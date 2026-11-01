@@ -4,6 +4,7 @@ import { ArrowRight, Lock, Zap, Eye, Check, X, AlertTriangle } from 'lucide-reac
 import NumberFlow from '@number-flow/react'
 import { useBoot, useScrollMotion, useMarquee } from '@/motion'
 import DotGrid from '@/components/DotGrid'
+import { KametiMark } from '@/components/Nav'
 import { useReadContract } from 'wagmi'
 import { KAMETI_ADDRESS, KAMETI_ABI, CHAIN_ID, formatUsdc, explorerAddr } from '@/lib/contract'
 import { useArcStrip, useKametiEvents, useInrRate } from '@/hooks/useLiveData'
@@ -375,8 +376,11 @@ export default function Home() {
       <footer className="frame">
         <div className="cell px-6 md:px-14 py-10 grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
           <div>
-            <p className="font-display text-5xl font-bold tracking-tight">KAMETI</p>
-            <p className="label text-muted mt-2">Onchain Chit Fund · {DISPLAY_NAME}</p>
+            <div className="flex items-center gap-3 mb-2">
+              <KametiMark size={40} />
+              <p className="font-display text-5xl font-bold tracking-tight">KAMETI</p>
+            </div>
+            <p className="label text-muted">Onchain Chit Fund · {DISPLAY_NAME}</p>
           </div>
           <div className="flex flex-col gap-2">
             <a href={explorerAddr(KAMETI_ADDRESS)} target="_blank" rel="noopener"
