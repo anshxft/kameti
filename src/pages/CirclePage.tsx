@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import {
   useAccount, useReadContract, useWriteContract,
@@ -18,8 +18,9 @@ import { friendlyError } from '@/lib/errors'
 import { buildShareLink } from '@/lib/share'
 import { useEip3009Sign } from '@/hooks/useEip3009'
 import { useInrRate } from '@/hooks/useLiveData'
-import { DISPLAY_NAME, KAMETI_DEPLOYED } from '@/config/network'
+import { DISPLAY_NAME, KAMETI_DEPLOYED, NET } from '@/config/network'
 import NotDeployedBanner from '@/components/NotDeployedBanner'
+import { useCanAfford, fmtUsdc } from '@/hooks/useUsdcBalance'
 import type { KametiCircle, MemberInfo, RoundRecord } from '@/lib/types'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -184,6 +185,7 @@ function CirclePageInner() {
   const { switchChain } = useSwitchChain()
   const publicClient = usePublicClient({ chainId: CHAIN_ID })
   const { signRoundAuth, signDepositAuth } = useEip3009Sign()
+  const { check: canAfford } = useCanAfford(address)
   const inrRate = useInrRate()
 
   const [shareUrl, setShareUrl]         = useState('')
@@ -328,16 +330,33 @@ function CirclePageInner() {
 
   // ── Transactions ──────────────────────────────────────────────────────────
   const { writeContract, data: hash, isPending } = useWriteContract()
-  const { isSuccess: txSuccess } = useWaitForTransactionReceipt({ hash })
+  const { isSuccess: txSuccess, isError: txError, data: txReceipt } = useWaitForTransactionReceipt({ hash })
 
   useEffect(() => {
     if (!txSuccess) return
+    // If the receipt shows reverted, show an error and do NOT refetch as success
+    if (txReceipt?.status === 'reverted') {
+      toast.error('Transaction reverted on-chain.', {
+        description: hash
+          ? <a href={explorerTx(hash)} target="_blank" rel="noopener" className="underline label">View failed tx →</a>
+          : undefined,
+      })
+      return
+    }
     refetchCircle().catch(() => null)
     refetchMembers().catch(() => null)
     fetchBids().catch(() => null)
     fetchClaimable().catch(() => null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txSuccess])
+  }, [txSuccess, txReceipt])
+
+  useEffect(() => {
+    if (!txError || !hash) return
+    toast.error('Transaction failed.', {
+      description: <a href={explorerTx(hash)} target="_blank" rel="noopener" className="underline label">View on explorer →</a>,
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txError])
 
   const isWrongChain = address && chainId !== CHAIN_ID
 
@@ -355,6 +374,21 @@ function CirclePageInner() {
     )
   }
 
+  // ── shared: balance check + faucet/bridge link ────────────────────────────
+  const insufficientToast = (have: bigint, need: bigint) => {
+    toast.error(`Insufficient USDC — need ${fmtUsdc(need)}, have ${fmtUsdc(have)}`, {
+      description: (
+        <span className="label text-[11px]">
+          {NET.isTestnet
+            ? <><span>Use </span><span className="font-bold">"Get test USDC"</span><span> in the sidebar, or </span><Link to="/bridge" className="underline">bridge in →</Link></>
+            : <Link to="/bridge" className="underline">Bridge USDC to {DISPLAY_NAME} →</Link>
+          }
+        </span>
+      ),
+      duration: 8000,
+    })
+  }
+
   // ── Join with EIP-3009 deposit authorization ──────────────────────────────
   // ABI: joinWithAuthorization(circleId, validBefore, nonce, v, r, s) — 6 args
   // value = deposit = contribution × depositMultiplier
@@ -363,30 +397,40 @@ function CirclePageInner() {
     if (!address) { toast.error('Connect your wallet'); return }
     if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
     const depositRaw = contribution * BigInt(depositMul)
+
+    // 1. Balance check
+    const afford = canAfford(depositRaw)
+    if (!afford.ok) { insufficientToast(afford.have, afford.need); return }
+
     setIsSigning(true)
+    let sig: Awaited<ReturnType<typeof signDepositAuth>>
     try {
       toast.info('Sign the deposit authorization in your wallet…')
-      const sig = await signDepositAuth(circleId, depositRaw)
-      toast.info('Submitting join transaction…')
-      writeContract(
-        {
-          address: KAMETI_ADDRESS, abi: KAMETI_ABI,
-          functionName: 'joinWithAuthorization',
-          args: [circleId, sig.validBefore, sig.nonce, sig.v, sig.r, sig.s],
-          chainId: CHAIN_ID,
-        },
-        {
-          onSuccess: (h) => toast.success('Joined!', {
-            description: <a href={explorerTx(h)} target="_blank" rel="noopener" className="underline label">View tx →</a>,
-          }),
-          onError: (e) => toast.error(friendlyError(e)),
-        }
-      )
-    } catch (e) {
-      toast.error(friendlyError(e))
-    } finally {
-      setIsSigning(false)
+      sig = await signDepositAuth(circleId, depositRaw)
+    } catch (e) { toast.error(friendlyError(e)); setIsSigning(false); return }
+    setIsSigning(false)
+
+    // 2. Simulate
+    const joinArgs = [circleId, sig.validBefore, sig.nonce, sig.v, sig.r, sig.s] as const
+    try {
+      if (publicClient) await publicClient.simulateContract({
+        address: KAMETI_ADDRESS, abi: KAMETI_ABI,
+        functionName: 'joinWithAuthorization', args: joinArgs, account: address,
+      })
+    } catch (simErr) {
+      toast.error(`Transaction would fail: ${friendlyError(simErr)}`, { duration: 7000 }); return
     }
+
+    toast.info('Submitting join transaction…')
+    writeContract(
+      { address: KAMETI_ADDRESS, abi: KAMETI_ABI, functionName: 'joinWithAuthorization', args: joinArgs, chainId: CHAIN_ID },
+      {
+        onSuccess: (h) => toast.success('Joined!', {
+          description: <a href={explorerTx(h)} target="_blank" rel="noopener" className="underline label">View tx →</a>,
+        }),
+        onError: (e) => toast.error(friendlyError(e)),
+      }
+    )
   }
 
   // ── Pay this round with EIP-3009 ──────────────────────────────────────────
@@ -395,38 +439,53 @@ function CirclePageInner() {
   const handlePay = async () => {
     if (!address) { toast.error('Connect your wallet'); return }
     if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
+
+    // 1. Balance check (canAfford adds the gas reserve internally)
+    const afford = canAfford(contribution)
+    if (!afford.ok) { insufficientToast(afford.have, afford.need); return }
+
     setIsSigning(true)
+    let sig: Awaited<ReturnType<typeof signRoundAuth>>
     try {
       toast.info('Sign the round payment in your wallet…')
-      const sig = await signRoundAuth(circleId, currentRound, contribution)
-      toast.info('Submitting payment…')
-      writeContract(
-        {
-          address: KAMETI_ADDRESS, abi: KAMETI_ABI,
-          functionName: 'payWithAuthorization',
-          args: [circleId, address, sig.validBefore, sig.v, sig.r, sig.s],
-          chainId: CHAIN_ID,
-        },
-        {
-          onSuccess: (h) => toast.success('Paid!', {
-            description: <a href={explorerTx(h)} target="_blank" rel="noopener" className="underline label">View tx →</a>,
-          }),
-          onError: (e) => toast.error(friendlyError(e)),
-        }
-      )
-    } catch (e) {
-      toast.error(friendlyError(e))
-    } finally {
-      setIsSigning(false)
+      sig = await signRoundAuth(circleId, currentRound, contribution)
+    } catch (e) { toast.error(friendlyError(e)); setIsSigning(false); return }
+    setIsSigning(false)
+
+    // 2. Simulate
+    const payArgs = [circleId, address, sig.validBefore, sig.v, sig.r, sig.s] as const
+    try {
+      if (publicClient) await publicClient.simulateContract({
+        address: KAMETI_ADDRESS, abi: KAMETI_ABI,
+        functionName: 'payWithAuthorization', args: payArgs, account: address,
+      })
+    } catch (simErr) {
+      toast.error(`Transaction would fail: ${friendlyError(simErr)}`, { duration: 7000 }); return
     }
+
+    toast.info('Submitting payment…')
+    writeContract(
+      { address: KAMETI_ADDRESS, abi: KAMETI_ABI, functionName: 'payWithAuthorization', args: payArgs, chainId: CHAIN_ID },
+      {
+        onSuccess: (h) => toast.success('Paid!', {
+          description: <a href={explorerTx(h)} target="_blank" rel="noopener" className="underline label">View tx →</a>,
+        }),
+        onError: (e) => toast.error(friendlyError(e)),
+      }
+    )
   }
 
   // ── Store AutoPay authorizations ──────────────────────────────────────────
   // ABI: storeAuthorizations(circleId, rounds, validBefores, vs, rs, ss) — no nonces array
-  // value = contribution; nonce per round from contract.roundNonce(circleId, round, member)
+  // value = contribution per round; nonce per round from contract.roundNonce
   const handleStoreAutoPay = async () => {
     if (!address) { toast.error('Connect your wallet'); return }
     if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
+
+    // 1. Balance check: storeAuthorizations has no USDC transfer, just needs gas
+    const afford = canAfford(0n)
+    if (!afford.ok) { insufficientToast(afford.have, afford.need); return }
+
     setIsSigning(true)
     try {
       const roundsLeft = maxMembers - currentRound + 1
@@ -444,14 +503,23 @@ function CirclePageInner() {
         rs.push(sig.r)
         ss.push(sig.s)
       }
+
+      const storeArgs = [circleId, rounds, validBefores, vs, rs, ss] as const
+
+      // 2. Simulate
+      try {
+        if (publicClient) await publicClient.simulateContract({
+          address: KAMETI_ADDRESS, abi: KAMETI_ABI,
+          functionName: 'storeAuthorizations', args: storeArgs, account: address,
+        })
+      } catch (simErr) {
+        toast.error(`Transaction would fail: ${friendlyError(simErr)}`, { duration: 7000 })
+        setIsSigning(false); return
+      }
+
       toast.info('Storing authorizations onchain…')
       writeContract(
-        {
-          address: KAMETI_ADDRESS, abi: KAMETI_ABI,
-          functionName: 'storeAuthorizations',
-          args: [circleId, rounds, validBefores, vs, rs, ss],
-          chainId: CHAIN_ID,
-        },
+        { address: KAMETI_ADDRESS, abi: KAMETI_ABI, functionName: 'storeAuthorizations', args: storeArgs, chainId: CHAIN_ID },
         {
           onSuccess: (h) => toast.success('AutoPay active!', {
             description: <a href={explorerTx(h)} target="_blank" rel="noopener" className="underline label">View tx →</a>,

@@ -1,48 +1,49 @@
 import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi'
+import { useNavigate, Link } from 'react-router-dom'
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, usePublicClient } from 'wagmi'
 import { toast } from 'sonner'
 import NumberFlow from '@number-flow/react'
 import { KAMETI_ADDRESS, KAMETI_ABI, CHAIN_ID, explorerTx } from '@/lib/contract'
-import { DISPLAY_NAME, KAMETI_DEPLOYED } from '@/config/network'
+import { DISPLAY_NAME, KAMETI_DEPLOYED, NET } from '@/config/network'
 import NotDeployedBanner from '@/components/NotDeployedBanner'
 import { friendlyError } from '@/lib/errors'
 import { useBoot } from '@/motion'
 import { useEip3009Sign } from '@/hooks/useEip3009'
 import { useInrRate } from '@/hooks/useLiveData'
-import { ArrowRight, Info, Loader2 } from 'lucide-react'
+import { useCanAfford, fmtUsdc, GAS_RESERVE_MIN } from '@/hooks/useUsdcBalance'
+import { ArrowRight, Info, Loader2, AlertTriangle } from 'lucide-react'
 
-// CircleCreated(uint256 indexed id, string name, uint256 contribution, uint8 maxMembers, address creator)
+// CircleCreated(uint256 indexed id, string name, ...)
 const CIRCLE_CREATED_TOPIC = '0x6b2b204c21110ae9f9b868c47c705e8c2c48109ca830f1c704a1b7d86adbe22d' as const
 
 const ROUND_PRESETS = [
   { label: '10 Min', seconds: 600 },
-  { label: '1 Day', seconds: 86400 },
+  { label: '1 Day',  seconds: 86400 },
   { label: '3 Days', seconds: 259200 },
   { label: '7 Days', seconds: 604800 },
-  { label: '14 Days', seconds: 1209600 },
-  { label: '30 Days', seconds: 2592000 },
+  { label: '14 Days',seconds: 1209600 },
+  { label: '30 Days',seconds: 2592000 },
 ]
 
 const SCORE_OPTIONS = [
   { label: 'None', value: 0 },
-  { label: '600', value: 600 },
-  { label: '650', value: 650 },
-  { label: '700', value: 700 },
+  { label: '600',  value: 600 },
+  { label: '650',  value: 650 },
+  { label: '700',  value: 700 },
 ]
 
 const POST_WIN_LOCK_OPTIONS = [
-  { label: '0%', value: 0 },
+  { label: '0%',  value: 0 },
   { label: '25%', value: 2500 },
   { label: '50%', value: 5000, default: true },
   { label: '75%', value: 7500 },
 ]
 
 const KEEPER_TIP_OPTIONS = [
-  { label: '0%', value: 0 },
-  { label: '0.1%', value: 10 },
+  { label: '0%',    value: 0 },
+  { label: '0.1%',  value: 10 },
   { label: '0.25%', value: 25 },
-  { label: '0.5%', value: 50 },
+  { label: '0.5%',  value: 50 },
 ]
 
 function Tip({ text }: { text: string }) {
@@ -66,27 +67,35 @@ function NewCircleInner() {
   const navigate = useNavigate()
   const { address, chainId: connectedChainId } = useAccount()
   const { switchChain } = useSwitchChain()
+  const publicClient   = usePublicClient({ chainId: CHAIN_ID })
   const { signCreateAuth } = useEip3009Sign()
+  const { check: canAfford, balance } = useCanAfford(address)
   const inrRate = useInrRate()
 
-  const [name, setName]                     = useState('')
-  const [contribution, setContribution]     = useState('10')
-  const [members, setMembers]               = useState(5)
-  const [roundSeconds, setRoundSeconds]     = useState(604800)
-  const [depositMul, setDepositMul]         = useState(2)
+  // ── Defaults: cheap / common case ──────────────────────────────────────────
+  const [name,           setName]           = useState('')
+  const [contribution,   setContribution]   = useState('1')     // 1 USDC
+  const [members,        setMembers]        = useState(3)        // 3 members
+  const [roundSeconds,   setRoundSeconds]   = useState(604800)   // 7 days
+  const [depositMul,     setDepositMul]     = useState(1)        // 1× deposit
   const [maxDiscountBps, setMaxDiscountBps] = useState(2000)
-  const [minScore, setMinScore]             = useState(0)
+  const [minScore,       setMinScore]       = useState(0)
   const [postWinLockBps, setPostWinLockBps] = useState(5000)
-  const [keeperTipBps, setKeeperTipBps]     = useState(10)
-  const [isSigning, setIsSigning]           = useState(false)
+  const [keeperTipBps,   setKeeperTipBps]   = useState(10)
+  const [isSigning,      setIsSigning]      = useState(false)
 
   const { writeContract, data: hash, isPending } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess, isError: isTxError, data: receipt } = useWaitForTransactionReceipt({ hash })
 
   const contrib    = parseFloat(contribution || '0')
   const pot        = contrib * members
   const deposit    = contrib * depositMul
   const roundDays  = roundSeconds / 86400
+
+  // Raw amounts in USDC micro-units (6 decimals)
+  const contributionRaw = BigInt(Math.round(Math.max(0, contrib) * 1_000_000))
+  const depositRaw      = contributionRaw * BigInt(depositMul)
+  const needRaw         = depositRaw + GAS_RESERVE_MIN  // minimum to show in preview
 
   const inrPot     = inrRate > 0 ? pot * inrRate : null
   const inrDeposit = inrRate > 0 ? deposit * inrRate : null
@@ -97,67 +106,118 @@ function NewCircleInner() {
 
   const isWrongChain = address && connectedChainId !== CHAIN_ID
 
-  const handleCreate = async () => {
-    if (!address) { toast.error('Connect your wallet first'); return }
-    if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
-    if (!name.trim()) { toast.error('Enter a circle name'); return }
-    if (!contrib || contrib <= 0) { toast.error('Enter a valid contribution amount'); return }
+  // ── Balance insufficiency check (reactive, no async) ──────────────────────
+  const balanceShort = balance !== undefined && depositRaw > 0n && balance < needRaw
+  const balanceMsg   = balanceShort
+    ? `You need ${fmtUsdc(needRaw)} USDC to create (deposit + ~gas), you have ${fmtUsdc(balance)}`
+    : null
 
-    const contributionRaw = BigInt(Math.round(contrib * 1_000_000))
-    const depositRaw      = contributionRaw * BigInt(depositMul)
+  // ── handleCreate ───────────────────────────────────────────────────────────
+  const handleCreate = async () => {
+    if (!address)       { toast.error('Connect your wallet first'); return }
+    if (isWrongChain)   { switchChain({ chainId: CHAIN_ID }); return }
+    if (!name.trim())   { toast.error('Enter a circle name'); return }
+    if (!contrib || contrib <= 0) { toast.error('Enter a valid contribution amount'); return }
+    if (!publicClient)  { toast.error('Public client not ready'); return }
+
+    // ── 1. Balance pre-flight ────────────────────────────────────────────────
+    const afford = canAfford(depositRaw)
+    if (!afford.ok) {
+      toast.error(`Insufficient USDC — need ${fmtUsdc(afford.need)}, have ${fmtUsdc(afford.have)}`, {
+        description: (
+          <span className="label text-[11px]">
+            {NET.isTestnet
+              ? <><a href="https://studio.arc.io" className="underline">Get test USDC</a> or <Link to="/bridge" className="underline">bridge in</Link></>
+              : <Link to="/bridge" className="underline">Bridge USDC to {DISPLAY_NAME}</Link>
+            }
+          </span>
+        ),
+        duration: 8000,
+      })
+      return
+    }
 
     setIsSigning(true)
+    let sig: Awaited<ReturnType<typeof signCreateAuth>>
     try {
       toast.info('Sign the deposit authorization in your wallet…')
-      // value = deposit (contribution × multiplier); nonce from createDepositNonce(creator)
-      const sig = await signCreateAuth(depositRaw)
-      toast.info('Submitting…')
-      // ABI: createCircleWithAuthorization(name, contribution, maxMembers, roundDuration,
-      //   depositMultiplier, maxDiscountBps, minScore, postWinLockBps, keeperTipBps,
-      //   validBefore, nonce, v, r, s)  — 14 args total
-      writeContract(
-        {
-          address: KAMETI_ADDRESS, abi: KAMETI_ABI,
-          functionName: 'createCircleWithAuthorization',
-          args: [
-            name, contributionRaw,
-            members, BigInt(roundSeconds),
-            depositMul, maxDiscountBps, minScore, postWinLockBps, keeperTipBps,
-            sig.validBefore, sig.nonce, sig.v, sig.r, sig.s,
-          ],
-          chainId: CHAIN_ID,
-        },
-        {
-          onSuccess: (txHash) => toast.success('Circle created!', {
-            description: <a href={explorerTx(txHash)} target="_blank" rel="noopener" className="underline label">View on explorer →</a>,
-          }),
-          onError: (e) => toast.error(friendlyError(e)),
-        }
-      )
+      sig = await signCreateAuth(depositRaw)
     } catch (e) {
       toast.error(friendlyError(e))
-    } finally {
       setIsSigning(false)
+      return
+    }
+    setIsSigning(false)
+
+    // ── 2. Simulate before sending ───────────────────────────────────────────
+    const callArgs = [
+      name, contributionRaw,
+      members, BigInt(roundSeconds),
+      depositMul, maxDiscountBps, minScore, postWinLockBps, keeperTipBps,
+      sig.validBefore, sig.nonce, sig.v, sig.r, sig.s,
+    ] as const
+    try {
+      await publicClient.simulateContract({
+        address: KAMETI_ADDRESS, abi: KAMETI_ABI,
+        functionName: 'createCircleWithAuthorization',
+        args: callArgs,
+        account: address,
+      })
+    } catch (simErr: unknown) {
+      const reason = friendlyError(simErr)
+      toast.error(`Transaction would fail: ${reason}`, { duration: 7000 })
+      return
+    }
+
+    // ── 3. Send ──────────────────────────────────────────────────────────────
+    toast.info('Submitting…')
+    writeContract(
+      {
+        address: KAMETI_ADDRESS, abi: KAMETI_ABI,
+        functionName: 'createCircleWithAuthorization',
+        args: callArgs,
+        chainId: CHAIN_ID,
+      },
+      {
+        onSuccess: (txHash) => toast.success('Transaction sent!', {
+          description: <a href={explorerTx(txHash)} target="_blank" rel="noopener" className="underline label">View on explorer →</a>,
+        }),
+        onError: (e) => toast.error(friendlyError(e)),
+      }
+    )
+  }
+
+  // ── Post-confirmation: navigate to the new circle or show revert ───────────
+  if (isSuccess && receipt) {
+    if (receipt.status === 'reverted') {
+      toast.error('Transaction reverted on-chain.', {
+        description: hash
+          ? <a href={explorerTx(hash)} target="_blank" rel="noopener" className="underline label">View failed tx →</a>
+          : undefined,
+      })
+    } else {
+      const createdLog = receipt.logs.find(
+        l => l.address.toLowerCase() === KAMETI_ADDRESS.toLowerCase() &&
+             l.topics[0] === CIRCLE_CREATED_TOPIC
+      )
+      const newId = createdLog?.topics[1] != null ? BigInt(createdLog.topics[1]) : null
+      if (newId != null) {
+        setTimeout(() => { void navigate(`/k/${newId.toString()}`) }, 800)
+      } else {
+        setTimeout(() => { void navigate('/me') }, 800)
+      }
     }
   }
 
-  // After confirmation, read the new circle id from the CircleCreated log and navigate.
-  // CircleCreated(uint256 indexed id, ...) — topic[1] is the id.
-  // Circle ids start at 0, so we never treat 0 as missing.
-  if (isSuccess && receipt) {
-    const createdLog = receipt.logs.find(
-      l => l.address.toLowerCase() === KAMETI_ADDRESS.toLowerCase() &&
-           l.topics[0] === CIRCLE_CREATED_TOPIC
-    )
-    const newId = createdLog?.topics[1] != null ? BigInt(createdLog.topics[1]) : null
-    if (newId != null) {
-      setTimeout(() => { void navigate(`/k/${newId.toString()}`) }, 800)
-    } else {
-      setTimeout(() => { void navigate('/me') }, 800)
-    }
+  // wagmi's isError fires when the tx hash is known but the receipt status is reverted
+  if (isTxError && hash) {
+    toast.error('Transaction failed.', {
+      description: <a href={explorerTx(hash)} target="_blank" rel="noopener" className="underline label">View on explorer →</a>,
+    })
   }
 
   const busy = isPending || isConfirming || isSigning
+  const ctaDisabled = busy || !address || (!!balanceMsg && !isSigning)
 
   return (
     <div ref={pageRef} className="pt-12 min-h-screen overflow-x-hidden">
@@ -193,7 +253,7 @@ function NewCircleInner() {
                   type="number"
                   value={contribution}
                   onChange={e => setContribution(e.target.value)}
-                  placeholder="10"
+                  placeholder="1"
                   min="0.01"
                   step="0.01"
                   className="flex-1 min-w-0 bg-transparent px-4 py-3 font-display text-2xl font-bold text-ink placeholder:text-muted outline-none"
@@ -312,18 +372,34 @@ function NewCircleInner() {
               </div>
             </div>
 
+            {/* Balance warning */}
+            {balanceMsg && (
+              <div className="flex items-start gap-2 cell px-4 py-3 border border-signal-ink/40">
+                <AlertTriangle size={13} className="shrink-0 mt-0.5 text-signal-ink" />
+                <div className="flex-1 min-w-0">
+                  <p className="label text-signal-ink text-[11px] font-bold">{balanceMsg}</p>
+                  <p className="label text-muted text-[10px] mt-0.5">
+                    {NET.isTestnet
+                      ? <>Use <span className="text-ink">"Get test USDC"</span> in the sidebar, or <Link to="/bridge" className="underline link-line">bridge in →</Link></>
+                      : <Link to="/bridge" className="underline link-line">Bridge USDC to {DISPLAY_NAME} →</Link>
+                    }
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* CTA */}
             <button
               onClick={() => { void handleCreate() }}
-              disabled={busy || !address}
+              disabled={ctaDisabled}
               className="press w-full cell py-4 bg-signal text-on-signal border border-ink label font-bold flex items-center justify-center gap-2 hover:bg-signal-hover disabled:opacity-40"
             >
-              {isSigning ? <><Loader2 size={14} className="animate-spin" /> Sign deposit in wallet…</> :
-               isPending ? 'Confirm in wallet…' :
+              {isSigning    ? <><Loader2 size={14} className="animate-spin" /> Sign deposit in wallet…</> :
+               isPending    ? 'Confirm in wallet…' :
                isConfirming ? 'Creating circle…' :
-               isSuccess ? 'Done!' :
                isWrongChain ? `Switch to ${DISPLAY_NAME}` :
-               !address ? 'Connect wallet first' :
+               !address     ? 'Connect wallet first' :
+               balanceMsg   ? 'Insufficient USDC' :
                <><>Create Circle</> <ArrowRight size={14} /></>}
             </button>
             <p className="label text-muted text-[10px] -mt-4">
@@ -379,6 +455,24 @@ function NewCircleInner() {
               <p className="label text-muted mt-0.5">of pot per settle</p>
             </div>
           </div>
+
+          {/* You need now */}
+          {contrib > 0 && (
+            <div className={`cell p-4 border ${balanceShort ? 'border-signal-ink/40' : 'border-line'}`}>
+              <p className="label text-muted mb-2 text-[10px]">YOU NEED NOW</p>
+              <p className="font-display text-2xl font-bold">
+                {fmtUsdc(needRaw)} USDC
+              </p>
+              <p className="label text-muted text-[10px] mt-1">
+                {fmtUsdc(depositRaw)} deposit + ~{fmtUsdc(GAS_RESERVE_MIN)} gas
+                {balance !== undefined && (
+                  <span className={`ml-2 ${balance >= needRaw ? 'text-signal-ink' : 'text-signal-ink font-bold'}`}>
+                    · you have {fmtUsdc(balance)}
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
 
           {/* Payout schedule */}
           <div>
