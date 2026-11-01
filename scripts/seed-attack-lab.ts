@@ -197,8 +197,10 @@ async function main() {
   console.log('  w3 has stored auth for round 1 but has NOT paid (attack 4 gas-griefing target).')
 
   // Write wrong-round fixture: w3's round-2 auth submitted as round 1 → USDC nonce rejection
+  // Use a one-year expiry so the fixture stays valid long after the seeding session.
+  const FIXTURE_VALID_BEFORE = BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 3600)
   const r2Nonce = await publicClient.readContract({ address: CONTRACT, abi: KAMETI_ABI, functionName: 'roundNonce', args: [labId, 2, w3.acct.address] })
-  const r2Auth = await signReceiveAuth(w3.acct, w3.acct.address, CONTRACT, CONTRIBUTION, VALID_BEFORE, r2Nonce)
+  const r2Auth = await signReceiveAuth(w3.acct, w3.acct.address, CONTRACT, CONTRIBUTION, FIXTURE_VALID_BEFORE, r2Nonce)
 
   const fixtureData = {
     _comment: `Round-2 auth for w3 (${w3.acct.address}) in Attack Lab circle #${labId}. Submit while circle is in round 1 → USDC nonce mismatch.`,
@@ -207,7 +209,7 @@ async function main() {
       circleId: labId.toString(),
       targetRound: 1,
       signedForRound: 2,
-      validBefore: VALID_BEFORE.toString(),
+      validBefore: FIXTURE_VALID_BEFORE.toString(),
       v: r2Auth.v,
       r: r2Auth.r,
       s: r2Auth.s,
