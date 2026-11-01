@@ -295,7 +295,8 @@ function CirclePageInner() {
   const canBid     = isMember && !!me && alreadyPaid && !me.won && !me.defaulted
 
   const eligibleCount = members.filter(m => !m.won && !m.defaulted).length
-  const bidReason = !isMember ? 'not a member' :
+  const bidReason = !address ? 'connect your wallet' :
+    !isMember ? 'not a member' :
     !alreadyPaid ? 'pay first to bid' :
     me?.won ? 'you already won' :
     me?.defaulted ? 'defaulted — not eligible' :
@@ -838,7 +839,7 @@ function CirclePageInner() {
                   </>
                 ) : (
                   <p className="label text-muted">
-                    {bidReason ? `Can't bid: ${bidReason}.` : settlePhase ? 'Bidding closed — settle the round.' : ''}
+                    {settlePhase ? 'Bidding closed — settle the round.' : bidReason ? `Can't bid: ${bidReason}.` : ''}
                   </p>
                 )}
 
@@ -1060,6 +1061,7 @@ function CirclePageInner() {
                     {shareUrl}
                   </div>
                   <button onClick={() => { void navigator.clipboard.writeText(shareUrl); toast.success('Copied!') }}
+                    aria-label="Copy invite link"
                     className="press cell px-4 hover:bg-paper-2 shrink-0">
                     <Copy size={14} />
                   </button>

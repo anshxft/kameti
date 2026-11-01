@@ -36,7 +36,7 @@ const ABI_STATS = {
 }
 
 const WHAT_DONE = [
-  'EIP-3009 ReceiveWithAuthorization on native Arc USDC — sign once, no approve, no gas each round',
+  'EIP-3009 ReceiveWithAuthorization on native Arc USDC — sign each round up front, no approve, no gas each round',
   'Post-win lock: part of the winner\'s payout stays locked and releases as they keep paying future rounds',
   'Keeper tip: configurable % incentivises timely settlement',
   'SLH-DSA (FIPS 205) post-quantum withdrawal guard via Arc precompile 0x1800…0004',
