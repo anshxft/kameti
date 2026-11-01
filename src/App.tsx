@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
+import { Toaster } from 'sonner'
 import ErrorBoundary from './components/ErrorBoundary'
 import Nav from './components/Nav'
 import PinwheelCursor from './components/PinwheelCursor'
@@ -32,6 +33,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <ScrollReset />
+      {/* Inside the router: low-balance toasts contain <Link>s to /bridge */}
+      <Toaster position="top-center" />
       <PinwheelCursor />
       <Nav />
       <PageEnter>
