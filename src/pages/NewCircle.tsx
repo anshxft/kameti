@@ -39,11 +39,12 @@ const POST_WIN_LOCK_OPTIONS = [
   { label: '75%', value: 7500 },
 ]
 
+// Contract enforces keeperTipBps ≤ 20 (0.20%) — do not add options above that.
 const KEEPER_TIP_OPTIONS = [
-  { label: '0%',    value: 0 },
-  { label: '0.1%',  value: 10 },
-  { label: '0.25%', value: 25 },
-  { label: '0.5%',  value: 50 },
+  { label: '0%',     value: 0 },
+  { label: '0.05%',  value: 5 },
+  { label: '0.1%',   value: 10 },
+  { label: '0.2%',   value: 20 },
 ]
 
 function Tip({ text }: { text: string }) {
@@ -342,7 +343,7 @@ function NewCircleInner() {
                   >{o.label}</button>
                 ))}
               </div>
-              <Tip text="After winning, a portion of the deposit stays locked until all future rounds are paid on time. Higher = more protection for remaining members." />
+              <Tip text="After winning, a portion of the payout stays locked and is released as the winner pays each future round on time. Higher = more protection for remaining members." />
             </div>
 
             {/* Keeper tip */}
@@ -447,7 +448,7 @@ function NewCircleInner() {
             <div className="cell p-5">
               <p className="label text-muted mb-1">Post-win Lock</p>
               <p className="font-display text-xl font-bold">{postWinLockBps / 100}%</p>
-              <p className="label text-muted mt-0.5">of deposit stays locked</p>
+              <p className="label text-muted mt-0.5">of payout locked for winner</p>
             </div>
             <div className="cell p-5">
               <p className="label text-muted mb-1">Keeper Tip</p>

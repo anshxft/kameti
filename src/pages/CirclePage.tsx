@@ -27,6 +27,26 @@ import type { KametiCircle, MemberInfo, RoundRecord } from '@/lib/types'
 const STATUS_LABELS = ['OPEN', 'ACTIVE', 'COMPLETED'] as const
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 
+/**
+ * Format a raw micro-USDC amount (number or bigint) for display.
+ * Uses up to 6 decimal places but trims trailing zeros, always showing
+ * at least enough digits that the value is non-zero (never "0.00" when
+ * the true value is e.g. 0.003).
+ */
+function fmtBid(raw: number | bigint): string {
+  const n = typeof raw === 'bigint' ? Number(raw) : raw
+  const usdc = n / 1_000_000
+  if (usdc >= 1) return usdc.toFixed(2)
+  // Find first non-zero decimal place and show 2 more digits beyond it
+  if (usdc === 0) return '0.00'
+  const s = usdc.toFixed(6)          // e.g. "0.003000"
+  const trimmed = s.replace(/0+$/, '') // e.g. "0.003"
+  // Ensure at least 2 significant decimal digits shown
+  const dotIdx = trimmed.indexOf('.')
+  const decimals = dotIdx >= 0 ? trimmed.length - dotIdx - 1 : 0
+  return decimals < 2 ? usdc.toFixed(2) : trimmed
+}
+
 // Minimal USDC ABI fragments used in the rejoin path
 const USDC_REJOIN_ABI = [
   {
@@ -211,6 +231,7 @@ function CirclePageInner() {
 
   const [shareUrl, setShareUrl]         = useState('')
   const [bidAmount, setBidAmount]       = useState('')
+  const bidPrefilled = useRef(false)
   const [bidFeed, setBidFeed]           = useState<BidEntry[]>([])
   const [memberScores, setMemberScores] = useState<Record<string, number>>({})
   const [myClaimable, setMyClaimable]   = useState<bigint>(0n)
@@ -263,6 +284,14 @@ function CirclePageInner() {
 
   const minNextBid = Number(highestDiscount) + Math.max(1, Number(pot) / 100)
   const maxBid     = Number(pot) * maxDiscountBps / 10000
+
+  // Prefill bid input once circle data arrives (or when highest bid changes)
+  useEffect(() => {
+    if (minNextBid > 0 && !bidPrefilled.current) {
+      setBidAmount(fmtBid(minNextBid))
+      bidPrefilled.current = true
+    }
+  }, [minNextBid])
   const canBid     = isMember && !!me && alreadyPaid && !me.won && !me.defaulted
 
   const eligibleCount = members.filter(m => !m.won && !m.defaulted).length
@@ -727,7 +756,7 @@ function CirclePageInner() {
                     <div>
                       <p className="label text-muted mb-1">Highest Bid</p>
                       <p className="font-display text-4xl font-bold text-signal-ink">
-                        <NumberFlow value={Number(highestDiscount) / 1e6} format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }} /> USDC
+                        {fmtBid(highestDiscount)} USDC
                       </p>
                       <p className="label text-muted mt-1">
                         by {address && highestBidder.toLowerCase() === address.toLowerCase() ? 'YOU' : formatAddress(highestBidder)}
@@ -737,16 +766,14 @@ function CirclePageInner() {
                       <div className="flex justify-between">
                         <span className="label text-muted">Winner receives</span>
                         <span className="label font-bold">
-                          <NumberFlow value={(Number(pot) - Number(highestDiscount)) / 1e6}
-                            format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }} /> USDC
+                          {fmtBid(pot - highestDiscount)} USDC
                         </span>
                       </div>
                       {n > 1 && (
                         <div className="flex justify-between">
                           <span className="label text-muted">Each other earns</span>
                           <span className="label text-signal-ink font-bold">
-                            +<NumberFlow value={Number(highestDiscount) / 1e6 / (n - 1)}
-                              format={{ minimumFractionDigits: 2, maximumFractionDigits: 2 }} /> USDC
+                            +{fmtBid(Number(highestDiscount) / (n - 1))} USDC
                           </span>
                         </div>
                       )}
@@ -771,30 +798,37 @@ function CirclePageInner() {
                         <input
                           type="number" value={bidAmount}
                           onChange={e => setBidAmount(e.target.value)}
-                          placeholder={(minNextBid / 1e6).toFixed(2)}
-                          min={0} step={0.01}
+                          placeholder={fmtBid(minNextBid)}
+                          min={minNextBid / 1e6}
+                          step={Math.max(0.000001, minNextBid / 1e6 / 10)}
                           className="flex-1 bg-transparent border border-line px-4 py-3 font-display text-2xl font-bold focus:border-ink outline-none"
                         />
                         <div className="cell px-3 flex items-center label text-muted">USDC</div>
                       </div>
                       <p className="label text-muted mt-1 text-[10px]">
-                        Min next: {(minNextBid / 1e6).toFixed(2)} · Cap: {(maxBid / 1e6).toFixed(2)}
+                        Min next: {fmtBid(minNextBid)} · Cap: {fmtBid(maxBid)}
                       </p>
                     </div>
                     <div className="flex gap-0">
                       {[1, 5].map(pct => (
                         <button key={pct}
-                          onClick={() => setBidAmount(((minNextBid + Number(pot) * pct / 100) / 1e6).toFixed(2))}
+                          onClick={() => setBidAmount(fmtBid(minNextBid + Math.round(Number(pot) * pct / 100)))}
                           className="press cell px-4 py-2 label text-muted hover:bg-paper-2">+{pct}%</button>
                       ))}
                       <button
-                        onClick={() => setBidAmount((maxBid / 1e6).toFixed(2))}
+                        onClick={() => setBidAmount(fmtBid(maxBid))}
                         className="press cell px-4 py-2 label text-muted hover:bg-paper-2">MAX</button>
                     </div>
                     <button
                       onClick={() => {
                         const d = Math.round(parseFloat(bidAmount) * 1e6)
                         if (!d || isNaN(d)) { toast.error('Enter a bid amount'); return }
+                        if (d < minNextBid) {
+                          toast.error(`Bid too low — minimum is ${fmtBid(minNextBid)} USDC`); return
+                        }
+                        if (d > maxBid) {
+                          toast.error(`Bid exceeds cap of ${fmtBid(maxBid)} USDC`); return
+                        }
                         tx('placeBid', [circleId, BigInt(d)], 'Bid')
                       }}
                       disabled={isPending}
