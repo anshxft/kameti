@@ -19,6 +19,17 @@ function stateFor(target: EventTarget | null): CursorState {
   return target.closest(CLICKABLE) ? 'hover' : 'idle'
 }
 
+/** The Kameti mark as bare paths, so CSS can colour and spin it. */
+export function PinwheelMark({ className }: { className: string }) {
+  return (
+    <svg className={className} viewBox="0 0 100 100" aria-hidden="true">
+      {[0, 90, 180, 270].map((deg) => (
+        <path key={deg} d={PETAL} transform={`rotate(${deg} 50 50)`} />
+      ))}
+    </svg>
+  )
+}
+
 export default function PinwheelCursor() {
   const root = useRef<HTMLDivElement>(null)
 
@@ -64,11 +75,7 @@ export default function PinwheelCursor() {
   return (
     <div ref={root} className="pinwheel-cursor" data-state="idle" aria-hidden="true">
       <div className="pinwheel-cursor__body">
-        <svg className="pinwheel-cursor__mark" viewBox="0 0 100 100">
-          {[0, 90, 180, 270].map((deg) => (
-            <path key={deg} d={PETAL} transform={`rotate(${deg} 50 50)`} />
-          ))}
-        </svg>
+        <PinwheelMark className="pinwheel-cursor__mark" />
       </div>
     </div>
   )

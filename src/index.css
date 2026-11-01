@@ -259,3 +259,128 @@ body {
     rotate: 360deg;
   }
 }
+
+/* ─── Quiet page motion ──────────────────────────────────────────────────── */
+.page-enter {
+  animation: page-enter 260ms var(--ease-out) backwards;
+}
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+/* Slow brand mark behind the hero headline */
+.hero-pinwheel {
+  position: absolute;
+  top: 50%;
+  right: -90px;
+  width: 560px;
+  height: 560px;
+  margin-top: -280px;
+  fill: var(--ink);
+  opacity: 0.06;
+  animation: pinwheel-spin 80s linear infinite;
+  pointer-events: none;
+}
+.hero-pinwheel path:first-child {
+  fill: var(--signal-ink);
+}
+:root[data-theme="dark"] .hero-pinwheel {
+  opacity: 0.09;
+}
+
+/* Live block number flashes mint when a new block lands */
+.block-tick {
+  animation: block-tick 700ms ease-out;
+}
+@keyframes block-tick {
+  from { color: var(--signal-ink); }
+}
+
+/* Struck-through cheat. Static line by default, drawn on scroll where supported. */
+.strike {
+  background: linear-gradient(currentColor, currentColor) 0 55% / 100% 1px no-repeat;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.scroll-line {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  z-index: 1;
+  width: 100%;
+  height: 2px;
+  background: var(--signal-ink);
+  transform-origin: left;
+  pointer-events: none;
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .strike {
+      animation: strike-draw linear both;
+      animation-timeline: view();
+      animation-range: entry 60% cover 45%;
+    }
+    .scroll-line {
+      animation: scroll-line-draw linear both;
+      animation-timeline: view();
+      animation-range: entry 40% cover 60%;
+    }
+    .scroll-turn {
+      display: block;
+      animation: scroll-turn linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 60%;
+    }
+  }
+}
+@keyframes strike-draw {
+  from { background-size: 0 1px; }
+}
+@keyframes scroll-line-draw {
+  from { transform: scaleX(0); }
+}
+@keyframes scroll-turn {
+  from { rotate: -180deg; }
+}
+
+/* FAQ accordion */
+.faq-q {
+  transition: background-color 160ms ease;
+}
+.faq-q svg {
+  transition: rotate 240ms var(--ease-out);
+}
+.faq-item[data-open="true"] .faq-q svg {
+  rotate: 135deg;
+}
+.faq-a {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition: grid-template-rows 260ms var(--ease-out), visibility 260ms;
+}
+.faq-a > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.faq-item[data-open="true"] .faq-a {
+  grid-template-rows: 1fr;
+  visibility: visible;
+}
+
+/* Calculator slider */
+.calc-range {
+  height: 24px;
+  accent-color: var(--signal-ink);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .faq-q:hover { background: var(--paper-2); }
+
+  .cheat-icon { transition: transform 240ms var(--ease-out); }
+  .cheat:hover .cheat-icon { transform: rotate(-8deg) scale(1.08); }
+
+  /* Arrows lean into the click */
+  .press svg.lucide-arrow-right { transition: translate 200ms var(--ease-out); }
+  .press:hover svg.lucide-arrow-right { translate: 3px 0; }
+}

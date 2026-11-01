@@ -5,6 +5,9 @@ import NumberFlow from '@number-flow/react'
 import { useBoot, useScrollMotion, useMarquee } from '@/motion'
 import DotGrid from '@/components/DotGrid'
 import { KametiMark } from '@/components/Nav'
+import Faq from '@/components/Faq'
+import RoundCalculator from '@/components/RoundCalculator'
+import { PinwheelMark } from '@/components/PinwheelCursor'
 import { useReadContract } from 'wagmi'
 import { KAMETI_ADDRESS, KAMETI_ABI, CHAIN_ID, formatUsdc, explorerAddr } from '@/lib/contract'
 import { useArcStrip, useKametiEvents, useInrRate } from '@/hooks/useLiveData'
@@ -40,7 +43,10 @@ function ArcStrip() {
         <div className="flex items-center gap-1 shrink-0">
           <span className="stat-dot" style={{ '--i': 0 } as React.CSSProperties} />
           <span className="label text-[10px] text-muted">
-            {strip.blockNumber != null ? `#${strip.blockNumber.toLocaleString()}` : 'connecting…'}
+            {/* Re-keyed per block so the flash replays on each new one */}
+            <span key={strip.blockNumber?.toString()} className="block-tick">
+              {strip.blockNumber != null ? `#${strip.blockNumber.toLocaleString()}` : 'connecting…'}
+            </span>
           </span>
         </div>
         {strip.paymentCostUsd != null && (
@@ -200,6 +206,7 @@ export default function Home() {
       <section className="frame relative min-h-[80vh] flex flex-col">
         <div data-boot className="cell relative flex-1 flex flex-col items-start justify-center px-6 md:px-14 py-20 overflow-hidden">
           <DotGrid />
+          <PinwheelMark className="hero-pinwheel hidden lg:block" />
           <div className="relative z-10 max-w-3xl">
             <p className="label text-muted mb-4">Real Chit Fund · {DISPLAY_NAME} · USDC only</p>
             <h1 className="font-display text-5xl md:text-7xl lg:text-8xl font-bold leading-none tracking-tight mb-6">
@@ -264,12 +271,12 @@ export default function Home() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {CHEATS.map((c) => (
-            <div key={c.cheat} className="cell p-8 flex flex-col gap-4" data-reveal>
-              <div className="w-10 h-10 bg-signal flex items-center justify-center shrink-0">
+            <div key={c.cheat} className="cheat cell p-8 flex flex-col gap-4" data-reveal>
+              <div className="cheat-icon w-10 h-10 bg-signal flex items-center justify-center shrink-0">
                 <c.icon size={20} className="text-on-signal" />
               </div>
               <div>
-                <p className="label text-muted mb-1 line-through text-[11px]">{c.cheat}</p>
+                <p className="label text-muted mb-1 text-[11px]"><span className="strike">{c.cheat}</span></p>
                 <h3 className="font-display text-base font-bold text-ink">{c.rule}</h3>
               </div>
               <p className="text-muted text-sm leading-relaxed">{c.detail}</p>
@@ -316,7 +323,8 @@ export default function Home() {
           <p className="label text-muted mb-2">Protocol</p>
           <h2 className="font-display text-4xl md:text-5xl font-bold mb-0">How it works</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="scroll-line" aria-hidden="true" />
           {STEPS.map((s) => (
             <div key={s.n} className="step cell p-8 cursor-default" data-reveal>
               <div className="step-num font-display text-5xl font-bold text-ink mb-6">{s.n}</div>
@@ -331,6 +339,8 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      <RoundCalculator inrRate={inrRate} />
 
       {/* What it doesn't do yet */}
       <section className="frame" data-reveal>
@@ -347,6 +357,8 @@ export default function Home() {
           </ul>
         </div>
       </section>
+
+      <Faq />
 
       {/* CTA */}
       <section className="frame" data-reveal>
@@ -376,7 +388,7 @@ export default function Home() {
         <div className="cell px-6 md:px-14 py-10 grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <KametiMark size={40} />
+              <span className="scroll-turn"><KametiMark size={40} /></span>
               <p className="font-display text-5xl font-bold tracking-tight">KAMETI</p>
             </div>
             <p className="label text-muted">Onchain Chit Fund · {DISPLAY_NAME}</p>
@@ -389,7 +401,7 @@ export default function Home() {
             <Link to="/reviewers" className="link-line label text-muted">For Reviewers</Link>
             <Link to="/score" className="link-line label text-muted">Kameti Score</Link>
           </div>
-          <p className="label text-muted md:text-right">Built on Arc · USDC is gas · Testnet</p>
+          <p className="label text-muted md:text-right">USDC is gas · {DISPLAY_NAME}</p>
         </div>
       </footer>
 

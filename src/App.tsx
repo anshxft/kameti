@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import Nav from './components/Nav'
@@ -20,13 +20,20 @@ function ScrollReset() {
   return null
 }
 
+// Soft fade on route change. `backwards` fill leaves no transform behind,
+// so position:fixed children keep the viewport as their containing block.
+function PageEnter({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
+  return <main key={pathname} className="page-enter">{children}</main>
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <ScrollReset />
       <PinwheelCursor />
       <Nav />
-      <main>
+      <PageEnter>
         <Suspense fallback={null}><Routes>
           <Route path="/"          element={<Home />} />
           <Route path="/new"       element={<NewCircle />} />
@@ -39,7 +46,7 @@ export default function App() {
           <Route path="/bridge"    element={<Bridge />} />
           <Route path="*" element={<div className="pt-32 px-6 md:px-14 pb-24"><p className="label text-muted mb-4">404</p><h1 className="font-display text-4xl md:text-6xl font-bold mb-8">This page does not exist.</h1><a href="/" className="link-line label text-ink font-bold">Back to home</a></div>} />
         </Routes></Suspense>
-      </main>
+      </PageEnter>
     </BrowserRouter>
   )
 }
