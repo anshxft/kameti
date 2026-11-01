@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import Nav from './components/Nav'
+import PinwheelCursor from './components/PinwheelCursor'
 import Home from './pages/Home'
 const NewCircle = lazy(() => import('./pages/NewCircle'))
 const CirclePage = lazy(() => import('./pages/CirclePage'))
@@ -23,6 +24,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ScrollReset />
+      <PinwheelCursor />
       <Nav />
       <main>
         <Suspense fallback={null}><Routes>
