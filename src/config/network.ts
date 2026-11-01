@@ -1,28 +1,24 @@
 /**
  * Network configuration — single switch via VITE_NETWORK.
  *
- * Default network is COMMITTED here as 'testnet'.
- * Set VITE_NETWORK=mainnet to point the whole app at Arc Mainnet.
+ * Default network is COMMITTED here as 'mainnet'.
+ * Set VITE_NETWORK=testnet to point the whole app at Arc Testnet.
  *
- * Mainnet Kameti address is also committed here (empty = not deployed yet).
- * Set VITE_KAMETI_MAINNET to override after mainnet deploy.
- * When the mainnet address is empty, KAMETI_DEPLOYED is false and the app
- * shows a "Mainnet contract not deployed yet" banner instead of calling a
- * wrong address.
+ * Mainnet Kameti address is committed here.
+ * Set VITE_KAMETI_MAINNET to override.
  *
  * /break is ALWAYS pinned to testnet — it never reads from this file.
  */
 
 // ── Committed defaults (Vercel builds have no .env) ──────────────────────────
-/** Default network. Change this when mainnet is ready to go live. */
-const DEFAULT_NETWORK = 'testnet' as const
+/** Default network. */
+const DEFAULT_NETWORK = 'mainnet' as const
 
 /**
  * Mainnet Kameti contract address — committed constant.
- * Empty string means not deployed yet.
  * Set VITE_KAMETI_MAINNET to override.
  */
-const MAINNET_KAMETI_DEFAULT = '' // fill in after mainnet deploy
+const MAINNET_KAMETI_DEFAULT = '0x049dE3a47D4baf6E9b4a40A589790b1C328e24b7'
 
 // ── Determine active network ─────────────────────────────────────────────────
 export type NetworkId = 'testnet' | 'mainnet'
@@ -84,19 +80,21 @@ const MAINNET_CONFIG: NetworkConfig = {
   kametiAddress: _mainnetAddr,            // empty string when not deployed
   usdcAddress:   '0x3600000000000000000000000000000000000000',
   usdcDomainSep: '0x940506929bba468048a19b567f4f0d534714bc06604b5c3017e5d16785ccdf84',
-  deployBlock:   0n,                      // set after mainnet deploy
+  deployBlock:   28_980_114n,
   demoCircleId:  0n,
   attackLabId:   0n,
   isTestnet:     false,
   bridgeDestId:  'Arc',                   // Blockchain.Arc — confirmed in App Kit types
-  mainnetReceipts: [],
+  mainnetReceipts: [
+    { label: 'Kameti v3.1 deploy', hash: '0x5e761b1aee5bdd7e040941ca50e88a2a1eb621eb615596aebb3acb2748cc06da' },
+  ],
 }
 
 export const NET: NetworkConfig = IS_MAINNET ? MAINNET_CONFIG : TESTNET_CONFIG
 
 /**
  * True when the Kameti contract is deployed on the active network.
- * Always true on testnet. False on mainnet until VITE_KAMETI_MAINNET is set.
+ * True on both mainnet and testnet with their committed addresses.
  * Pages that trigger write transactions MUST gate on this flag.
  */
 export const KAMETI_DEPLOYED: boolean = NET.kametiAddress.length > 0
