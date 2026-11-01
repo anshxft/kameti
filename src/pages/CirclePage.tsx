@@ -198,7 +198,7 @@ function AutoPaySection({
             <span className="label text-muted text-[10px]">Payments pre-signed</span>
           </div>
           <button
-            onClick={() => tx('revokeAutoPay', [circleId], 'AutoPay off')}
+            onClick={() => tx('revokeAutoPay', [circleId, currentRound], 'AutoPay off')}
             disabled={isPending}
             className="press cell py-2 px-4 border border-line label text-muted flex items-center gap-2 disabled:opacity-40"
           >

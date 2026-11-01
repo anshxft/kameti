@@ -28,6 +28,8 @@ export function KametiMark({ size, animate = false }: { size: number; animate?: 
 
   // Watch data-theme attribute changes
   useEffect(() => {
+    // The theme toggle renders after this mark and applies the stored theme, so re-read it.
+    setIsDark(document.documentElement.dataset.theme === 'dark')
     const obs = new MutationObserver(() => {
       setIsDark(document.documentElement.dataset.theme === 'dark')
     })
