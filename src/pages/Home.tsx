@@ -130,7 +130,7 @@ const CHEATS = [
     icon: Zap,
     cheat: 'An early winner stops paying',
     rule:  'Post-win lock: part of the payout stays locked',
-    detail: 'Part of the winner's payout stays locked and is released as they keep paying. Miss a round and the lock covers it first, then the deposit.',
+    detail: 'Part of the payout stays locked and is released as they keep paying. Miss a round and the lock covers it first, then the deposit.',
   },
   {
     icon: AlertTriangle,
