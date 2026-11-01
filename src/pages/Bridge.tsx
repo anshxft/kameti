@@ -1,12 +1,10 @@
 /**
- * /bridge — Bring USDC to Arc Testnet via Circle App Kit (CCTP).
+ * /bridge — Bring USDC to Arc via Circle App Kit (CCTP).
  *
  * No kit key required — CCTP bridge is keyless.
  * Uses wagmi v2 useAccount to get the connector/provider.
  *
- * Testnet routes: Ethereum Sepolia, Base Sepolia, Arbitrum Sepolia → Arc Testnet
- * Mainnet routes (VITE_BRIDGE_MAINNET=true): ETH, Base, ARB, OP, MATIC, AVAX → Arc
- *
+ * Routes are driven by VITE_NETWORK (default testnet).
  * Flow: pick chain → enter amount → estimate → bridge (approve/burn/attest/mint)
  * Step tracker shows live progress. Recover from interrupted burn via hash.
  */
@@ -19,14 +17,13 @@ import { createViemAdapterFromProvider } from '@circle-fin/adapter-viem-v2'
 import { type EIP1193Provider, type Chain, numberToHex } from 'viem'
 import { useBoot } from '@/motion'
 import { useInrRate } from '@/hooks/useLiveData'
+import { NET, IS_MAINNET, DISPLAY_NAME } from '@/config/network'
 
 // ── SDK chain identifier type ──────────────────────────────────────────────
 // The SDK uses Blockchain enum values (string literals like "Ethereum_Sepolia")
 type CircleChain = BridgeParams['from']['chain']
 
 // ── Chain registry ─────────────────────────────────────────────────────────
-const IS_MAINNET = import.meta.env.VITE_BRIDGE_MAINNET === 'true'
-
 interface RouteChain {
   label: string
   chainId: number   // EVM chain ID for wagmi switch
@@ -50,8 +47,8 @@ const MAINNET_ROUTES: RouteChain[] = [
 ]
 
 const SOURCE_ROUTES = IS_MAINNET ? MAINNET_ROUTES : TESTNET_ROUTES
-const DEST_CIRCLE_ID: string = IS_MAINNET ? 'Arc' : 'Arc_Testnet'
-const ARC_EXPLORER = IS_MAINNET ? 'https://explorer.arc.io' : 'https://explorer.testnet.arc.io'
+const DEST_CIRCLE_ID: string = NET.bridgeDestId
+const ARC_EXPLORER = NET.explorerBase
 
 // ── withAddChainFallback ───────────────────────────────────────────────────
 const isUnrecognizedChain = (error: unknown) => {
@@ -256,7 +253,7 @@ export default function Bridge() {
           <p className="label text-muted mb-2">CCTP · Keyless · No approve on Arc</p>
           <h1 className="font-display text-4xl md:text-5xl font-bold mb-3">Bridge USDC to Arc.</h1>
           <p className="font-sans text-muted text-base max-w-lg">
-            Burn on your source chain, mint on {IS_MAINNET ? 'Arc' : 'Arc Testnet'}. Fast transfer when the route supports it, otherwise up to ~20 minutes. Then pay your Kameti round — one signature, no further steps.
+            Burn on your source chain, mint on {DISPLAY_NAME}. Fast transfer when the route supports it, otherwise up to ~20 minutes. Then pay your Kameti round — one signature, no further steps.
           </p>
         </div>
 
@@ -288,7 +285,7 @@ export default function Bridge() {
             <div className="cell px-4 py-3 bg-paper-2 flex items-center justify-between gap-4">
               <div>
                 <p className="label text-muted text-[10px] mb-0.5">TO</p>
-                <p className="label text-ink font-bold">{IS_MAINNET ? 'Arc Mainnet' : 'Arc Testnet'}</p>
+                <p className="label text-ink font-bold">{DISPLAY_NAME}</p>
               </div>
               <ArrowRight size={14} className="text-muted" />
             </div>

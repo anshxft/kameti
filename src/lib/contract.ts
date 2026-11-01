@@ -1,30 +1,15 @@
-import { getUsdc, requireChain } from '@/onchain-facts'
 import metadata from '../../contracts/contract-metadata/Kameti.json'
+import {
+  CHAIN_ID, KAMETI_ADDRESS, ARC_VIEM_CHAIN, explorerTx, explorerAddr,
+} from '@/config/network'
 
-// ─── Network config (single source of truth) ────────────────────────────────
-// To switch to Arc Mainnet: change CHAIN_ID and CONTRACT_ADDRESS in .env
-export const CHAIN_ID: number = 5042002 // Arc Testnet
+// Re-export the active network values so existing imports keep working.
+export { CHAIN_ID, KAMETI_ADDRESS, explorerTx, explorerAddr }
 
-export const ARC_CHAIN = requireChain(CHAIN_ID)
-export const USDC = getUsdc(CHAIN_ID)!
-
-export const KAMETI_ADDRESS = (
-  import.meta.env.VITE_CONTRACT_ADDRESS ?? '0x34f31472c5d16e0562668fbea1e700b19b2ea5a7'
-) as `0x${string}`
+export const ARC_CHAIN    = ARC_VIEM_CHAIN
+export const arcTestnet   = ARC_VIEM_CHAIN   // wagmi config compat name
 
 export const KAMETI_ABI = metadata.abi
-
-// ─── Arc Testnet chain definition for wagmi ──────────────────────────────────
-export const arcTestnet = {
-  id: CHAIN_ID,
-  name: 'Arc Testnet',
-  nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
-  rpcUrls: { default: { http: ARC_CHAIN.rpcUrls as [string, ...string[]] } },
-  blockExplorers: {
-    default: { name: 'Arc Explorer', url: ARC_CHAIN.explorerBase },
-  },
-  testnet: true,
-} as const
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 export function formatAddress(addr: string) {
@@ -40,14 +25,6 @@ export function parseUsdc(amount: string): bigint {
   const n = parseFloat(amount)
   if (isNaN(n)) return 0n
   return BigInt(Math.round(n * 1_000_000))
-}
-
-export function explorerTx(hash: string) {
-  return `${ARC_CHAIN.explorerBase}/tx/${hash}`
-}
-
-export function explorerAddr(addr: string) {
-  return `${ARC_CHAIN.explorerBase}/address/${addr}`
 }
 
 export function formatDuration(seconds: number): string {
@@ -66,3 +43,7 @@ export function formatCountdown(endsAt: number): string {
   if (h > 0) return `${h}h ${m}m`
   return `${m}m`
 }
+
+// Keep USDC re-export for any files that import it from here
+import { getUsdc } from '@/onchain-facts'
+export const USDC = getUsdc(CHAIN_ID)!

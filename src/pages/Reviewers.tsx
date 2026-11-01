@@ -7,6 +7,7 @@ import { ExternalLink, ArrowRight, Check } from 'lucide-react'
 import { useBoot } from '@/motion'
 import { KAMETI_ADDRESS, CHAIN_ID, explorerAddr, explorerTx } from '@/lib/contract'
 import { DEMO_CIRCLE_ID } from '@/config/demo'
+import { DISPLAY_NAME } from '@/config/network'
 
 // ── Config (one-line switches when live) ────────────────────────────────────
 const GITHUB_URL       = 'https://github.com/anshxft/kameti'
@@ -108,7 +109,7 @@ export default function Reviewers() {
           </div>
           <div>
             <p className="label text-muted mb-1 text-[10px]">NETWORK</p>
-            <p className="label text-ink font-bold">Arc Testnet ({CHAIN_ID})</p>
+            <p className="label text-ink font-bold">{DISPLAY_NAME} ({CHAIN_ID})</p>
           </div>
           <div>
             <p className="label text-muted mb-1 text-[10px]">ABI ENTRIES</p>

@@ -6,14 +6,12 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPublicClient, http, webSocket, parseAbiItem } from 'viem'
-import { KAMETI_ADDRESS, CHAIN_ID } from '@/lib/contract'
-import { requireChain } from '@/onchain-facts'
+import { KAMETI_ADDRESS } from '@/lib/contract'
+import { NET } from '@/config/network'
 
-const chain = requireChain(CHAIN_ID)
-// HTTP RPC
-const HTTP_RPC = chain.rpcUrls[0]
-// WebSocket RPC (same host, swap protocol)
-const WS_RPC = HTTP_RPC.replace(/^https:\/\//, 'wss://')
+const HTTP_RPC     = NET.rpcUrl
+const WS_RPC       = NET.wsUrl
+const explorerBase = NET.explorerBase
 
 // ── INR rate ─────────────────────────────────────────────────────────────────
 let cachedInr = 0
@@ -130,8 +128,6 @@ export interface KametiEvent {
   href?: string
   ts: number
 }
-
-const explorerBase = chain.explorerBase
 
 export function useKametiEvents(maxEvents = 20) {
   const [events, setEvents] = useState<KametiEvent[]>([])

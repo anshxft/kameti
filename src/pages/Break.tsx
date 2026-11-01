@@ -11,13 +11,36 @@
  *   states stable across rounds. Attack 5 (PQ) targets the demo circle.
  */
 import { useRef, useState } from 'react'
-import { usePublicClient } from 'wagmi'
-import { decodeErrorResult, type Hex } from 'viem'
+import { createPublicClient, http, decodeErrorResult, type Hex } from 'viem'
 import { Shield, Clock, RefreshCw, Zap, Key, CheckCircle2, AlertCircle, Loader2, Info } from 'lucide-react'
 import { useBoot } from '@/motion'
-import { KAMETI_ADDRESS, KAMETI_ABI, CHAIN_ID, explorerAddr, explorerTx } from '@/lib/contract'
+// /break is always pinned to the TESTNET deployment, regardless of VITE_NETWORK.
+// The seeded Attack Lab (circle #7) and demo circle (#2) live on Arc Testnet only.
+import { KAMETI_ABI } from '@/lib/contract'
 import attackFixtures from '@/config/attackFixtures.json'
 import { DEMO_CIRCLE_ID, ATTACK_LAB_ID } from '@/config/demo'
+
+// ── Testnet constants (pinned — do NOT swap for network.ts values) ─────────────
+const BREAK_KAMETI_ADDRESS = '0x34f31472c5d16e0562668fbea1e700b19b2ea5a7' as `0x${string}`
+const BREAK_CHAIN_ID       = 5042002
+const TESTNET_EXPLORER     = 'https://explorer.testnet.arc.io'
+const breakExplorerTx   = (hash: string) => `${TESTNET_EXPLORER}/tx/${hash}`
+const breakExplorerAddr = (addr: string) => `${TESTNET_EXPLORER}/address/${addr}`
+
+// ── Module-level public client bound directly to Arc Testnet ──────────────────
+// Uses createPublicClient (not wagmi's usePublicClient) so it is always pointed
+// at the testnet RPC regardless of VITE_NETWORK.
+const TESTNET_VIEM_CHAIN = {
+  id: BREAK_CHAIN_ID,
+  name: 'Arc Testnet',
+  nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+  rpcUrls: { default: { http: ['https://rpc.testnet.arc.io'] as [string] } },
+} as const
+
+const breakPublicClient = createPublicClient({
+  chain: TESTNET_VIEM_CHAIN,
+  transport: http('https://rpc.testnet.arc.io'),
+})
 
 // ─── PQ target member ─────────────────────────────────────────────────────────
 // Member 2 in the demo circle: 0xaFdb1d87a1A766E63d22aa5C0FAC8481aaBda3aF
@@ -135,7 +158,7 @@ function AttackCard({
       </div>
 
       {state === 'done' && result && (
-        <ResultBanner result={result} explorerTxFn={explorerTx} />
+        <ResultBanner result={result} explorerTxFn={breakExplorerTx} />
       )}
     </div>
   )
@@ -191,14 +214,13 @@ function ResultBanner({ result, explorerTxFn: _explorerTxFn }: { result: AttackO
 export default function Break() {
   const pageRef = useRef<HTMLDivElement>(null)
   useBoot(pageRef)
-  const publicClient = usePublicClient({ chainId: CHAIN_ID })
 
   // ── Attack 1: settleRound before deadline → RoundNotSettleable ──────────────
   const attack1 = async (): Promise<AttackOutcome> => {
-    if (!publicClient) return { kind: 'not_run', reason: 'No public client' }
+    if (!breakPublicClient) return { kind: 'not_run', reason: 'No public client' }
     try {
-      await publicClient.simulateContract({
-        address: KAMETI_ADDRESS, abi: KAMETI_ABI as never,
+      await breakPublicClient.simulateContract({
+        address: BREAK_KAMETI_ADDRESS, abi: KAMETI_ABI as never,
         functionName: 'settleRound', args: [ATTACK_LAB_ID],
         account: '0x0000000000000000000000000000000000000001',
       })
@@ -212,12 +234,12 @@ export default function Break() {
 
   // ── Attack 2: pay() when already paid → AlreadyPaid ────────────────────────
   const attack2 = async (): Promise<AttackOutcome> => {
-    if (!publicClient) return { kind: 'not_run', reason: 'No public client' }
+    if (!breakPublicClient) return { kind: 'not_run', reason: 'No public client' }
     // Read members — find one that already paid this round
     let paidMember: `0x${string}` | undefined
     try {
-      const members = await publicClient.readContract({
-        address: KAMETI_ADDRESS, abi: KAMETI_ABI as never,
+      const members = await breakPublicClient.readContract({
+        address: BREAK_KAMETI_ADDRESS, abi: KAMETI_ABI as never,
         functionName: 'getMembers', args: [ATTACK_LAB_ID],
       }) as Array<{ addr: string; paidThisRound: boolean }>
       const found = members.find(m => m.paidThisRound)
@@ -225,8 +247,8 @@ export default function Break() {
     } catch { /* fall through */ }
     if (!paidMember) return { kind: 'not_run', reason: `Circle #${ATTACK_LAB_ID}: no member has paid yet this round. Run executeAutoPay first or wait for a payment.` }
     try {
-      await publicClient.simulateContract({
-        address: KAMETI_ADDRESS, abi: KAMETI_ABI as never,
+      await breakPublicClient.simulateContract({
+        address: BREAK_KAMETI_ADDRESS, abi: KAMETI_ABI as never,
         functionName: 'pay', args: [ATTACK_LAB_ID],
         account: paidMember,
       })
@@ -243,7 +265,7 @@ export default function Break() {
   // Uses a real member's future-round authorization saved by seed-demo.ts.
   // Submitting a round-(N+1) auth for round N causes the USDC contract to reject it.
   const attack3 = async (): Promise<AttackOutcome> => {
-    if (!publicClient) return { kind: 'not_run', reason: 'No public client' }
+    if (!breakPublicClient) return { kind: 'not_run', reason: 'No public client' }
 
     const fx = attackFixtures.wrongRoundFixture
     if (!fx) return { kind: 'not_run', reason: 'Wrong-round fixture not generated yet — run scripts/seed-attack-lab.ts to populate src/config/attackFixtures.json.' }
@@ -255,8 +277,8 @@ export default function Break() {
     // "FiatTokenV2: invalid signature" wrapped in the standard revert reason string.
     const { from, validBefore, v, r, s } = fx as { from: string; validBefore: string; v: number; r: string; s: string }
     try {
-      await publicClient.simulateContract({
-        address: KAMETI_ADDRESS, abi: KAMETI_ABI as never,
+      await breakPublicClient.simulateContract({
+        address: BREAK_KAMETI_ADDRESS, abi: KAMETI_ABI as never,
         functionName: 'payWithAuthorization',
         args: [ATTACK_LAB_ID, from as `0x${string}`, BigInt(validBefore), v, r as `0x${string}`, s as `0x${string}`],
         account: '0x0000000000000000000000000000000000000001',
@@ -283,20 +305,20 @@ export default function Break() {
 
   // ── Attack 4: executeAutoPay with gas < AUTOPAY_MIN_GAS ────────────────────
   const attack4 = async (): Promise<AttackOutcome> => {
-    if (!publicClient) return { kind: 'not_run', reason: 'No public client' }
+    if (!breakPublicClient) return { kind: 'not_run', reason: 'No public client' }
     // Verify at least one member has a stored authorization for the current round
     let hasStoredAuth = false
     try {
-      const members = await publicClient.readContract({
-        address: KAMETI_ADDRESS, abi: KAMETI_ABI as never,
+      const members = await breakPublicClient.readContract({
+        address: BREAK_KAMETI_ADDRESS, abi: KAMETI_ABI as never,
         functionName: 'getMembers', args: [ATTACK_LAB_ID],
       }) as Array<{ addr: string; hasStoredAuth: boolean; paidThisRound: boolean }>
       hasStoredAuth = members.some(m => m.hasStoredAuth && !m.paidThisRound)
     } catch { /* fall through */ }
     if (!hasStoredAuth) return { kind: 'not_run', reason: `Circle #${ATTACK_LAB_ID}: no member has a stored authorization for this round yet.` }
     try {
-      await publicClient.simulateContract({
-        address: KAMETI_ADDRESS, abi: KAMETI_ABI as never,
+      await breakPublicClient.simulateContract({
+        address: BREAK_KAMETI_ADDRESS, abi: KAMETI_ABI as never,
         functionName: 'executeAutoPay', args: [ATTACK_LAB_ID],
         account: '0x0000000000000000000000000000000000000001',
         gas: 119_999n,
@@ -314,7 +336,7 @@ export default function Break() {
 
   // ── Attack 5: withdrawPq with forged SLH-DSA sig → PqInvalidSignature ───────
   const attack5 = async (): Promise<AttackOutcome> => {
-    if (!publicClient) return { kind: 'not_run', reason: 'No public client' }
+    if (!breakPublicClient) return { kind: 'not_run', reason: 'No public client' }
     // Skip the log lookup — the event has a non-indexed vk field and the
     // contract has no public getter (no bytes left). Instead, just simulate:
     // PqGuardNotEnabled  → guard not set yet (neutral not-run)
@@ -322,8 +344,8 @@ export default function Break() {
     // PqInvalidSignature → guard active, forgery rejected (expected)
     const fakeSig = `0x${'00'.repeat(7856)}`
     try {
-      await publicClient.simulateContract({
-        address: KAMETI_ADDRESS, abi: KAMETI_ABI as never,
+      await breakPublicClient.simulateContract({
+        address: BREAK_KAMETI_ADDRESS, abi: KAMETI_ABI as never,
         functionName: 'withdrawPq',
         args: [PQ_TARGET_MEMBER, 1n, fakeSig],
         account: PQ_TARGET_MEMBER,
@@ -414,8 +436,11 @@ export default function Break() {
           <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
             <p className="label text-muted text-sm">
               Contract:{' '}
-              <a href={explorerAddr(KAMETI_ADDRESS)} target="_blank" rel="noopener"
-                className="link-line text-ink font-bold font-mono">{KAMETI_ADDRESS.slice(0,10)}…</a>
+              <a href={breakExplorerAddr(BREAK_KAMETI_ADDRESS)} target="_blank" rel="noopener"
+                className="link-line text-ink font-bold font-mono">{BREAK_KAMETI_ADDRESS.slice(0,10)}…</a>
+            </p>
+            <p className="label text-muted text-[10px]">
+              Runs against the testnet deployment 0x34f3…a5a7 — always, regardless of active network.
             </p>
             <p className="label text-signal-ink text-sm font-bold">Attack Lab circle {labId}</p>
             <p className="label text-signal-ink text-sm font-bold">Demo circle {demoId} (PQ attack)</p>

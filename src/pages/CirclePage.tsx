@@ -18,6 +18,8 @@ import { friendlyError } from '@/lib/errors'
 import { buildShareLink } from '@/lib/share'
 import { useEip3009Sign } from '@/hooks/useEip3009'
 import { useInrRate } from '@/hooks/useLiveData'
+import { DISPLAY_NAME, KAMETI_DEPLOYED } from '@/config/network'
+import NotDeployedBanner from '@/components/NotDeployedBanner'
 import type { KametiCircle, MemberInfo, RoundRecord } from '@/lib/types'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -31,14 +33,12 @@ function ScoreBadge({ score }: { score: number }) {
 }
 
 // ─── Deposit + lock bar ───────────────────────────────────────────────────────
-function ProtBar({ depositLeft, lockLeft, depositTotal, contribution, postWinLockBps }: {
+function ProtBar({ depositLeft, lockLeft, depositTotal }: {
   depositLeft: bigint; lockLeft: bigint; depositTotal: number
-  contribution: bigint; postWinLockBps: number
 }) {
   const dep  = Number(depositLeft) / 1e6
   const lock = Number(lockLeft) / 1e6
   const pct  = depositTotal > 0 ? Math.round((dep / depositTotal) * 100) : 0
-  const lockTotal = Number(contribution) / 1e6 * postWinLockBps / 10000
 
   return (
     <div className="mt-2 space-y-1.5">
@@ -51,15 +51,10 @@ function ProtBar({ depositLeft, lockLeft, depositTotal, contribution, postWinLoc
           <div className="h-full bg-signal transition-all" style={{ width: `${pct}%` }} />
         </div>
       </div>
-      {lock > 0 && lockTotal > 0 && (
-        <div>
-          <div className="flex justify-between mb-0.5">
-            <span className="label text-[9px] text-muted">POST-WIN LOCK</span>
-            <span className="label text-[9px] text-muted">{Math.round((lock / lockTotal) * 100)}%</span>
-          </div>
-          <div className="h-0.5 bg-line w-full">
-            <div className="h-full bg-signal-ink transition-all" style={{ width: `${Math.min(100, Math.round((lock / lockTotal) * 100))}%` }} />
-          </div>
+      {lock > 0 && (
+        <div className="flex justify-between">
+          <span className="label text-[9px] text-muted">POST-WIN LOCK</span>
+          <span className="label text-[9px] text-signal-ink font-bold">{lock.toFixed(2)} USDC locked</span>
         </div>
       )}
     </div>
@@ -68,10 +63,9 @@ function ProtBar({ depositLeft, lockLeft, depositTotal, contribution, postWinLoc
 
 // ─── Member cell ──────────────────────────────────────────────────────────────
 function MemberCell({
-  m, isYou, depositTotal, score, contribution, postWinLockBps,
+  m, isYou, depositTotal, score,
 }: {
   m: MemberInfo; isYou: boolean; depositTotal: number; score: number | undefined
-  contribution: bigint; postWinLockBps: number
 }) {
   const statusBlock = () => {
     if (m.defaulted) return <span className="label px-2 py-0.5 border border-line text-muted line-through">DEFAULTED{m.debt > 0n ? ` -${formatUsdc(m.debt)}` : ''}</span>
@@ -96,8 +90,6 @@ function MemberCell({
         depositLeft={m.depositLeft}
         lockLeft={m.lockLeft ?? 0n}
         depositTotal={depositTotal}
-        contribution={contribution}
-        postWinLockBps={postWinLockBps}
       />
     </div>
   )
@@ -178,6 +170,11 @@ function AutoPaySection({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CirclePage() {
+  if (!KAMETI_DEPLOYED) return <NotDeployedBanner />
+  return <CirclePageInner />
+}
+
+function CirclePageInner() {
   const { id } = useParams<{ id: string }>()
   const pageRef = useRef<HTMLDivElement>(null)
   useBoot(pageRef)
@@ -359,10 +356,12 @@ export default function CirclePage() {
   }
 
   // ── Join with EIP-3009 deposit authorization ──────────────────────────────
+  // ABI: joinWithAuthorization(circleId, validBefore, nonce, v, r, s) — 6 args
+  // value = deposit = contribution × depositMultiplier
+  // nonce = contract.depositNonce(circleId, member)
   const handleJoin = async () => {
     if (!address) { toast.error('Connect your wallet'); return }
     if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
-    if (!publicClient) { toast.error('Client not ready'); return }
     const depositRaw = contribution * BigInt(depositMul)
     setIsSigning(true)
     try {
@@ -373,7 +372,7 @@ export default function CirclePage() {
         {
           address: KAMETI_ADDRESS, abi: KAMETI_ABI,
           functionName: 'joinWithAuthorization',
-          args: [circleId, depositRaw, 0n, sig.validBefore, sig.nonce, sig.v, sig.r, sig.s],
+          args: [circleId, sig.validBefore, sig.nonce, sig.v, sig.r, sig.s],
           chainId: CHAIN_ID,
         },
         {
@@ -391,6 +390,8 @@ export default function CirclePage() {
   }
 
   // ── Pay this round with EIP-3009 ──────────────────────────────────────────
+  // ABI: payWithAuthorization(circleId, from, validBefore, v, r, s) — 6 args, no nonce
+  // value = contribution; nonce = contract.roundNonce(circleId, round, member) (used in sig only)
   const handlePay = async () => {
     if (!address) { toast.error('Connect your wallet'); return }
     if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
@@ -403,54 +404,52 @@ export default function CirclePage() {
         {
           address: KAMETI_ADDRESS, abi: KAMETI_ABI,
           functionName: 'payWithAuthorization',
-          args: [circleId, 0n, sig.validBefore, sig.nonce, sig.v, sig.r, sig.s],
+          args: [circleId, address, sig.validBefore, sig.v, sig.r, sig.s],
           chainId: CHAIN_ID,
         },
         {
           onSuccess: (h) => toast.success('Paid!', {
             description: <a href={explorerTx(h)} target="_blank" rel="noopener" className="underline label">View tx →</a>,
           }),
-          onError: (_e) => {
-            // Fallback: plain pay()
-            toast.warning('EIP-3009 rejected — trying plain pay()…')
-            tx('pay', [circleId], 'Paid')
-          },
+          onError: (e) => toast.error(friendlyError(e)),
         }
       )
-    } catch {
-      toast.warning('Signing failed — trying plain pay()…')
-      tx('pay', [circleId], 'Paid')
+    } catch (e) {
+      toast.error(friendlyError(e))
     } finally {
       setIsSigning(false)
     }
   }
 
   // ── Store AutoPay authorizations ──────────────────────────────────────────
+  // ABI: storeAuthorizations(circleId, rounds, validBefores, vs, rs, ss) — no nonces array
+  // value = contribution; nonce per round from contract.roundNonce(circleId, round, member)
   const handleStoreAutoPay = async () => {
     if (!address) { toast.error('Connect your wallet'); return }
     if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
     setIsSigning(true)
     try {
       const roundsLeft = maxMembers - currentRound + 1
-      const sigs: { validBefore: bigint; nonce: Hex; v: number; r: Hex; s: Hex }[] = []
+      const rounds: number[] = []
+      const validBefores: bigint[] = []
+      const vs: number[] = []
+      const rs: Hex[] = []
+      const ss: Hex[] = []
       for (let r = currentRound; r <= maxMembers; r++) {
         toast.info(`Sign payment ${r - currentRound + 1} of ${roundsLeft}…`)
         const sig = await signRoundAuth(circleId, r, contribution)
-        sigs.push({ validBefore: sig.validBefore, nonce: sig.nonce, v: sig.v, r: sig.r, s: sig.s })
+        rounds.push(r)
+        validBefores.push(sig.validBefore)
+        vs.push(sig.v)
+        rs.push(sig.r)
+        ss.push(sig.s)
       }
       toast.info('Storing authorizations onchain…')
       writeContract(
         {
           address: KAMETI_ADDRESS, abi: KAMETI_ABI,
           functionName: 'storeAuthorizations',
-          args: [
-            circleId,
-            sigs.map(s => s.validBefore),
-            sigs.map(s => s.nonce),
-            sigs.map(s => s.v),
-            sigs.map(s => s.r),
-            sigs.map(s => s.s),
-          ],
+          args: [circleId, rounds, validBefores, vs, rs, ss],
           chainId: CHAIN_ID,
         },
         {
@@ -662,8 +661,6 @@ export default function CirclePage() {
                   isYou={!!address && m.addr.toLowerCase() === address.toLowerCase()}
                   depositTotal={depositTotal}
                   score={memberScores[m.addr.toLowerCase()]}
-                  contribution={contribution}
-                  postWinLockBps={postWinLockBps}
                 />
               )
             })}
@@ -678,7 +675,7 @@ export default function CirclePage() {
             {!address && <p className="label text-muted">Connect your wallet to interact.</p>}
             {isWrongChain && (
               <button onClick={() => switchChain({ chainId: CHAIN_ID })}
-                className="press cell py-3 px-6 bg-signal text-on-signal border border-ink label">Switch to Arc Testnet</button>
+                className="press cell py-3 px-6 bg-signal text-on-signal border border-ink label">Switch to {DISPLAY_NAME}</button>
             )}
 
             {/* Join */}

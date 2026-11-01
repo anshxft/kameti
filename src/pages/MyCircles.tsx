@@ -5,6 +5,8 @@ import { ArrowRight } from 'lucide-react'
 import NumberFlow from '@number-flow/react'
 import { useBoot } from '@/motion'
 import { KAMETI_ADDRESS, KAMETI_ABI, CHAIN_ID, formatUsdc, formatCountdown } from '@/lib/contract'
+import { DISPLAY_NAME, KAMETI_DEPLOYED } from '@/config/network'
+import NotDeployedBanner from '@/components/NotDeployedBanner'
 import { ConnectKitButton } from 'connectkit'
 import type { KametiCircle, MemberInfo } from '@/lib/types'
 import { scoreTier } from '@/lib/types'
@@ -159,6 +161,11 @@ function CircleCard({ circleId, myAddress }: { circleId: bigint; myAddress: stri
 }
 
 export default function MyCircles() {
+  if (!KAMETI_DEPLOYED) return <NotDeployedBanner />
+  return <MyCirclesInner />
+}
+
+function MyCirclesInner() {
   const pageRef = useRef<HTMLDivElement>(null)
   useBoot(pageRef)
 
@@ -203,7 +210,7 @@ export default function MyCircles() {
           <div className="cell p-6" data-boot>
             <button onClick={() => switchChain({ chainId: CHAIN_ID })}
               className="press cell py-3 px-8 bg-signal text-on-signal label font-bold">
-              Switch to Arc Testnet
+              Switch to {DISPLAY_NAME}
             </button>
           </div>
         )}

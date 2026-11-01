@@ -9,6 +9,7 @@ import { KAMETI_ADDRESS, KAMETI_ABI, CHAIN_ID, formatUsdc, explorerAddr } from '
 import { useArcStrip, useKametiEvents, useInrRate } from '@/hooks/useLiveData'
 import type { KametiEvent } from '@/hooks/useLiveData'
 import { DEMO_CIRCLE_ID } from '@/config/demo'
+import { DISPLAY_NAME } from '@/config/network'
 
 // ─── Headline ────────────────────────────────────────────────────────────────
 function ShuffleHeadline({ text }: { text: string }) {
@@ -200,7 +201,7 @@ export default function Home() {
         <div data-boot className="cell relative flex-1 flex flex-col items-start justify-center px-6 md:px-14 py-20 overflow-hidden">
           <DotGrid />
           <div className="relative z-10 max-w-3xl">
-            <p className="label text-muted mb-4">Real Chit Fund · Arc Testnet · USDC only</p>
+            <p className="label text-muted mb-4">Real Chit Fund · {DISPLAY_NAME} · USDC only</p>
             <h1 className="font-display text-5xl md:text-7xl lg:text-8xl font-bold leading-none tracking-tight mb-6">
               <ShuffleHeadline text="A KAMETI" />
               <br />
@@ -375,7 +376,7 @@ export default function Home() {
         <div className="cell px-6 md:px-14 py-10 grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
           <div>
             <p className="font-display text-5xl font-bold tracking-tight">KAMETI</p>
-            <p className="label text-muted mt-2">Onchain Chit Fund · Arc Testnet</p>
+            <p className="label text-muted mt-2">Onchain Chit Fund · {DISPLAY_NAME}</p>
           </div>
           <div className="flex flex-col gap-2">
             <a href={explorerAddr(KAMETI_ADDRESS)} target="_blank" rel="noopener"

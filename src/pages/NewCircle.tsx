@@ -1,14 +1,19 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, usePublicClient } from 'wagmi'
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi'
 import { toast } from 'sonner'
 import NumberFlow from '@number-flow/react'
 import { KAMETI_ADDRESS, KAMETI_ABI, CHAIN_ID, explorerTx } from '@/lib/contract'
+import { DISPLAY_NAME, KAMETI_DEPLOYED } from '@/config/network'
+import NotDeployedBanner from '@/components/NotDeployedBanner'
 import { friendlyError } from '@/lib/errors'
 import { useBoot } from '@/motion'
 import { useEip3009Sign } from '@/hooks/useEip3009'
 import { useInrRate } from '@/hooks/useLiveData'
 import { ArrowRight, Info, Loader2 } from 'lucide-react'
+
+// CircleCreated(uint256 indexed id, string name, uint256 contribution, uint8 maxMembers, address creator)
+const CIRCLE_CREATED_TOPIC = '0x6b2b204c21110ae9f9b868c47c705e8c2c48109ca830f1c704a1b7d86adbe22d' as const
 
 const ROUND_PRESETS = [
   { label: '10 Min', seconds: 600 },
@@ -50,35 +55,38 @@ function Tip({ text }: { text: string }) {
 }
 
 export default function NewCircle() {
+  if (!KAMETI_DEPLOYED) return <NotDeployedBanner />
+  return <NewCircleInner />
+}
+
+function NewCircleInner() {
   const pageRef = useRef<HTMLDivElement>(null)
   useBoot(pageRef)
 
   const navigate = useNavigate()
-  const { address, chainId } = useAccount()
+  const { address, chainId: connectedChainId } = useAccount()
   const { switchChain } = useSwitchChain()
-  const publicClient = usePublicClient({ chainId: CHAIN_ID })
-  const { signDepositAuth } = useEip3009Sign()
+  const { signCreateAuth } = useEip3009Sign()
   const inrRate = useInrRate()
 
-  const [name, setName]                   = useState('')
-  const [contribution, setContribution]   = useState('10')
-  const [members, setMembers]             = useState(5)
-  const [roundSeconds, setRoundSeconds]   = useState(604800)
-  const [depositMul, setDepositMul]       = useState(2)
+  const [name, setName]                     = useState('')
+  const [contribution, setContribution]     = useState('10')
+  const [members, setMembers]               = useState(5)
+  const [roundSeconds, setRoundSeconds]     = useState(604800)
+  const [depositMul, setDepositMul]         = useState(2)
   const [maxDiscountBps, setMaxDiscountBps] = useState(2000)
-  const [minScore, setMinScore]           = useState(0)
+  const [minScore, setMinScore]             = useState(0)
   const [postWinLockBps, setPostWinLockBps] = useState(5000)
-  const [keeperTipBps, setKeeperTipBps]   = useState(10)
-
-  const [isSigning, setIsSigning]         = useState(false)
+  const [keeperTipBps, setKeeperTipBps]     = useState(10)
+  const [isSigning, setIsSigning]           = useState(false)
 
   const { writeContract, data: hash, isPending } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash })
 
-  const contrib = parseFloat(contribution || '0')
-  const pot     = contrib * members
-  const deposit = contrib * depositMul
-  const roundDays = roundSeconds / 86400
+  const contrib    = parseFloat(contribution || '0')
+  const pot        = contrib * members
+  const deposit    = contrib * depositMul
+  const roundDays  = roundSeconds / 86400
 
   const inrPot     = inrRate > 0 ? pot * inrRate : null
   const inrDeposit = inrRate > 0 ? deposit * inrRate : null
@@ -87,59 +95,35 @@ export default function NewCircle() {
   const exampleWinner   = pot - exampleDiscount
   const exampleDividend = members > 1 ? exampleDiscount / (members - 1) : 0
 
-  const isWrongChain = address && chainId !== CHAIN_ID
+  const isWrongChain = address && connectedChainId !== CHAIN_ID
 
   const handleCreate = async () => {
     if (!address) { toast.error('Connect your wallet first'); return }
     if (isWrongChain) { switchChain({ chainId: CHAIN_ID }); return }
     if (!name.trim()) { toast.error('Enter a circle name'); return }
     if (!contrib || contrib <= 0) { toast.error('Enter a valid contribution amount'); return }
-    if (!publicClient) { toast.error('Public client not ready'); return }
 
     const contributionRaw = BigInt(Math.round(contrib * 1_000_000))
     const depositRaw      = contributionRaw * BigInt(depositMul)
 
-    // We need the circleId that will be assigned = totalCircles (before create)
-    // so we can build the depositNonce.
-    let nextId: bigint
-    try {
-      nextId = await publicClient.readContract({
-        address: KAMETI_ADDRESS,
-        abi: KAMETI_ABI as never,
-        functionName: 'totalCircles',
-      })
-    } catch {
-      toast.error('Could not read totalCircles — try plain create instead')
-      // Fallback: plain createCircle (no EIP-3009 deposit)
-      writeContract(
-        {
-          address: KAMETI_ADDRESS, abi: KAMETI_ABI,
-          functionName: 'createCircle',
-          args: [name, contributionRaw, members, BigInt(roundSeconds), depositMul, maxDiscountBps, minScore, postWinLockBps, keeperTipBps],
-          chainId: CHAIN_ID,
-        },
-        {
-          onSuccess: (txHash) => toast.success('Circle created!', {
-            description: <a href={explorerTx(txHash)} target="_blank" rel="noopener" className="underline label">View on explorer →</a>,
-          }),
-          onError: (e) => toast.error(friendlyError(e)),
-        }
-      )
-      return
-    }
-
     setIsSigning(true)
     try {
       toast.info('Sign the deposit authorization in your wallet…')
-      const sig = await signDepositAuth(nextId, depositRaw)
+      // value = deposit (contribution × multiplier); nonce from createDepositNonce(creator)
+      const sig = await signCreateAuth(depositRaw)
       toast.info('Submitting…')
+      // ABI: createCircleWithAuthorization(name, contribution, maxMembers, roundDuration,
+      //   depositMultiplier, maxDiscountBps, minScore, postWinLockBps, keeperTipBps,
+      //   validBefore, nonce, v, r, s)  — 14 args total
       writeContract(
         {
           address: KAMETI_ADDRESS, abi: KAMETI_ABI,
           functionName: 'createCircleWithAuthorization',
           args: [
-            name, contributionRaw, members, BigInt(roundSeconds), depositMul, maxDiscountBps, minScore, postWinLockBps, keeperTipBps,
-            depositRaw, 0n, sig.validBefore, sig.nonce, sig.v, sig.r, sig.s,
+            name, contributionRaw,
+            members, BigInt(roundSeconds),
+            depositMul, maxDiscountBps, minScore, postWinLockBps, keeperTipBps,
+            sig.validBefore, sig.nonce, sig.v, sig.r, sig.s,
           ],
           chainId: CHAIN_ID,
         },
@@ -157,8 +141,20 @@ export default function NewCircle() {
     }
   }
 
-  if (isSuccess) {
-    setTimeout(() => { void navigate('/me') }, 1200)
+  // After confirmation, read the new circle id from the CircleCreated log and navigate.
+  // CircleCreated(uint256 indexed id, ...) — topic[1] is the id.
+  // Circle ids start at 0, so we never treat 0 as missing.
+  if (isSuccess && receipt) {
+    const createdLog = receipt.logs.find(
+      l => l.address.toLowerCase() === KAMETI_ADDRESS.toLowerCase() &&
+           l.topics[0] === CIRCLE_CREATED_TOPIC
+    )
+    const newId = createdLog?.topics[1] != null ? BigInt(createdLog.topics[1]) : null
+    if (newId != null) {
+      setTimeout(() => { void navigate(`/k/${newId.toString()}`) }, 800)
+    } else {
+      setTimeout(() => { void navigate('/me') }, 800)
+    }
   }
 
   const busy = isPending || isConfirming || isSigning
@@ -326,7 +322,7 @@ export default function NewCircle() {
                isPending ? 'Confirm in wallet…' :
                isConfirming ? 'Creating circle…' :
                isSuccess ? 'Done!' :
-               isWrongChain ? 'Switch to Arc Testnet' :
+               isWrongChain ? `Switch to ${DISPLAY_NAME}` :
                !address ? 'Connect wallet first' :
                <><>Create Circle</> <ArrowRight size={14} /></>}
             </button>
