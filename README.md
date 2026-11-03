@@ -105,7 +105,7 @@ The circles so far are small test circles run by the builder from their own wall
 
 ## How it was built in Arc Studio
 
-The contract, tests, audits and app were written in Arc Studio, driven through its CLI from a coding agent. Bugs found in review or in the browser went back to Studio as prompts. After Studio's daily limit ran out, the last UI, performance and crash fixes, the FAQ and the round calculator were written outside Studio by the same coding agent, and are in the git history:
+The contract, tests, audits and app were written in Arc Studio, driven through its CLI from a coding agent. Bugs found in review or in the browser went back to Studio as prompts. After Studio's daily limit ran out, the last UI, performance and crash fixes, the FAQ and the round calculator were written outside Studio by the same coding agent, and are in the git history. On 3 Nov 2026, after the submission deadline, these files were copied into the Studio project unchanged, and its production build passes:
 
 1. v1: circle, tests and the Cybercore design system; Studio's auditors found fund-lock and griefing risks, fixed with pull payments.
 2. v2: a real chit fund (bidding, deposits, debt, Kameti Score), max preset with fuzz and invariant tests; review caught a missing deadline check in `pay`.
